@@ -17,7 +17,7 @@ env:
 jobs:
   deploy-azure-resources:
     runs-on: ubuntu-latest
-    name: Prepare Image Gallery
+    name: Create Azure Resources
 
     steps:
       - name: Checkout Repository
@@ -28,7 +28,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy Azure Resources
+      - name: Apply Bicep
         uses: azure/CLI@v1
         with:
           azcliversion: 2.24.2

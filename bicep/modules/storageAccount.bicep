@@ -15,13 +15,11 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
 
   resource symbolicname 'fileServices@2021-02-01' = {
     name: 'default'
-    properties: {
-      protocolSettings: {
-        smb: {
-          multichannel: {
-            enabled: true
-          }
-        }
+
+    resource symbolicname 'shares@2021-02-01' = {
+      name: 'foundrydata'
+      properties: {
+        enabledProtocols: 'SMB'
       }
     }
   }
