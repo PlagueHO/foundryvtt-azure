@@ -1,0 +1,47 @@
+name: deploy-aci
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  LOCATION: AustraliaEast
+  BASE_RESOURCE_NAME: dsrfoundryvtt
+  RESOURCE_GROUP_NAME: dsr-foundryvtt-rg
+
+jobs:
+  deploy-azure-resources:
+    runs-on: ubuntu-latest
+    name: Create Azure Resources
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Apply Bicep
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.24.2
+          inlineScript: |
+            az account show
+            date=$(date +"%Y%m%d%H%M")
+            az deployment sub create \
+              --name "foundryvtt-aci-${date}" \
+              --location $LOCATION \
+              --template-file bicep/aci.bicep \
+              --parameters location="$LOCATION" \
+                           baseResourceName="$BASE_RESOURCE_NAME" \
+                           resourceGroupName="$RESOURCE_GROUP_NAME" \
+                           foundryUsername="$FOUNDRY_USERNAME" \
+                           foundryPassword="$FOUNDRY_PASSWORD" \
+                           foundryAdminKey="$FOUNDRY_ADMIN_KEY"
