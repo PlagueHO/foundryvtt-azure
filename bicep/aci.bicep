@@ -14,12 +14,19 @@ param foundryUsername string
 @secure()
 param foundryPassword string
 
+@description('The admin key to set Foundry VTT up with.')
 @secure()
 param foundryAdminKey string
 
+@description('The storage account SKU to use to store the Foundry VTT user data.')
 @allowed([
-  'Premium_LRS'
   'Standard_LRS'
+  'Standard_RAGRS'
+  'Standard_ZRS'
+  'Premium_LRS'
+  'Premium_ZRS'
+  'Standard_GZRS'
+  'Standard_RAGZRS'
 ])
 param storageSku string = 'Standard_LRS'
 
