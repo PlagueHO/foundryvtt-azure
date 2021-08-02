@@ -13,6 +13,9 @@ env:
   AZURE_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
   AZURE_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
   AZURE_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
+  FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+  FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+  FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
 jobs:
   deploy-azure-resources:
@@ -39,4 +42,4 @@ jobs:
               --name "foundryvtt-aci-${date}" \
               --location $LOCATION \
               --template-file bicep/main.bicep \
-              --parameters location="$LOCATION" baseResourceName="$BASE_RESOURCE_NAME" resourceGroupName="$RESOURCE_GROUP_NAME"
+              --parameters location="$LOCATION" baseResourceName="$BASE_RESOURCE_NAME" resourceGroupName="$RESOURCE_GROUP_NAME" foundryUsername="$FOUNDRY_USERNAME" foundryPassword="$FOUNDRY_PASSWORD" foundryAdminKey="$FOUNDRY_ADMIN_KEY"
