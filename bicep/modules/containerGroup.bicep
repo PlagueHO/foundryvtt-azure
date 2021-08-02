@@ -57,9 +57,8 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
           }
           volumeMounts: [
             {
-              name: 'bind'
+              name: 'foundrydata'
               mountPath: '/data'
-              readOnly: false
             }
           ]
         }
@@ -79,7 +78,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
     osType: 'Linux'
     volumes: [
       {
-        name: 'string'
+        name: 'foundrydata'
         azureFile: {
           shareName: shareName
           storageAccountName: storageAccountName
