@@ -34,7 +34,7 @@ module containerGroup './modules/containerGroup.bicep' = {
   params: {
     location: location
     storageAccountName: baseResourceName
-    containerGroupName: '{containerGroupName}-aci'
+    containerGroupName: '${baseResourceName}-aci'
     containerDnsName: baseResourceName
     foundryUsername: foundryUsername
     foundryPassword: foundryPassword
