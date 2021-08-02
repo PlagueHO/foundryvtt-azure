@@ -12,6 +12,7 @@ param storageShareName string = 'foundryvttdata'
   'Standard_RAGZRS'
 ])
 param storageSku string = 'Standard_LRS'
+param storageShareQuota int = 10240
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   name: storageAccountName
@@ -32,6 +33,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
       name: storageShareName
       properties: {
         enabledProtocols: 'SMB'
+        shareQuota: storageShareQuota
       }
     }
   }
