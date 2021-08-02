@@ -1,0 +1,42 @@
+name: deploy-azure-container-instance
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  LOCATION: AustraliaEast
+  BASE_RESOURCE_NAME: dsrfoundryvtt
+  RESOURCE_GROUP_NAME: dsr-foundryvtt-rg
+  AZURE_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
+  AZURE_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
+  AZURE_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
+  AZURE_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
+
+jobs:
+  deploy-azure-resources:
+    runs-on: ubuntu-latest
+    name: Prepare Image Gallery
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Azure Resources
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.24.2
+          inlineScript: |
+            az account show
+            date=$(date +"%Y%m%d%H%M")
+            az deployment sub create \
+              --name "foundryvtt-aci-${date}" \
+              --location $LOCATION \
+              --template-file bicep/main.bicep \
+              --parameters location="$LOCATION" baseResourceName="$BASE_RESOURCE_NAME" resourceGroupName="$RESOURCE_GROUP_NAME"
