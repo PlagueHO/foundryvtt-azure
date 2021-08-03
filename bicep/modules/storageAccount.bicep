@@ -19,7 +19,7 @@ param storageShareQuota int = 5120
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   name: storageAccountName
   location: location
-  kind: 'StorageV2'
+  kind: 'FileStorage'
   sku: {
     name: storageSku
   }
