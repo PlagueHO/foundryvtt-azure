@@ -33,7 +33,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
       name: storageShareName
       properties: {
         enabledProtocols: 'SMB'
-        shareQuota: storageShareQuota
+        // shareQuota: storageShareQuota
       }
     }
   }
