@@ -7,8 +7,6 @@ on:
 
 env:
   LOCATION: AustraliaEast
-  BASE_RESOURCE_NAME: dsrfoundryvtt
-  RESOURCE_GROUP_NAME: dsr-foundryvtt-rg
   STORAGE_SHARE_QUOTA: 5120
   CONTAINER_CPU: 2
   CONTAINER_MEMORY_IN_GB: 1.5
@@ -18,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Create Azure Resources
     env:
+      BASE_RESOURCE_NAME: ${{ secrets.BASE_RESOURCE_NAME }}
+      RESOURCE_GROUP_NAME: ${{ secrets.RESOURCE_GROUP_NAME }}
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}

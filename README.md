@@ -21,8 +21,6 @@ The workflow for this deployment can be found in [.github\workflows\deploy-azure
 The following environment variables should be configured in the workflow to ensure that resource names for Storage Account and Container DNS are globally unique:
 
 - LOCATION: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- BASE_RESOURCE_NAME: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `dsrfoundryvtt`.
-- RESOURCE_GROUP_NAME: The name of the Azure resource group to create and add the resources to. For example, `dsr-foundryvtt-rg`.
 - STORAGE_SHARE_QUOTA: The maximum amount of storage that will be allocated to Foundry VTT user data.
 - CONTAINER_CPU: The number of CPU cores to assign to the Foundry VTT container.
 - CONTAINER_MEMORY_IN_GB: The amount of memory in GB to assign to the Foundry VTT container.
@@ -30,6 +28,10 @@ The following environment variables should be configured in the workflow to ensu
 The following GitHub Secrets need to be defined:
 
 - AZURE_CREDENTIALS: Created as per [this document](https://github.com/marketplace/actions/azure-cli-action#configure-azure-credentials-as-github-secret).
+- BASE_RESOURCE_NAME: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
+- RESOURCE_GROUP_NAME: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - FOUNDRY_USERNAME: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release`
 - FOUNDRY_PASSWORD: Your Foundry VTT password. This is used by the `felddy/foundryvtt:release`
 - FOUNDRY_ADMIN_KEY: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
+
+These values should be kept secret and care taken to ensure they are not shared with anyone.
