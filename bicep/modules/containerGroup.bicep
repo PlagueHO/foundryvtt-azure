@@ -88,3 +88,5 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
     sku: 'Standard'
   }
 }
+
+output url string = 'http://${containerGroup.properties.ipAddress.fqdn}:30000'

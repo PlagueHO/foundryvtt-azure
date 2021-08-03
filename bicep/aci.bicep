@@ -68,3 +68,5 @@ module containerGroup './modules/containerGroup.bicep' = {
     containerMemoryInGB: containerMemoryInGB
   }
 }
+
+output url string = containerGroup.outputs.url
