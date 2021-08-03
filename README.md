@@ -4,12 +4,12 @@ Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (tha
 
 The project uses GitHub actions to deploy the resources to Azure using the [GitHub Action Azure CLI task](https://github.com/marketplace/actions/azure-cli-action) and [Azure Bicep](https://aka.ms/Bicep).
 
-This repository will deploy a Foundry Virtual Table top using various different methods to suit your requirements:
+This repository will deploy a Foundry Virtual Table top using various different Azure architectures to suit your requirements. The compute and storage is separated into different services to enable update and redeployment of the server without loss of the Foundry VTT data:
 
-- [Azure Container Instances with Azure Files](#azure-container-instances-with-azure-files)
-- Azure Container Instances with Azure Files and Azure Front Door - planned
-- Azure App Service for Linux Containers and Azure Files - planned
-- Azure Kubernetes Service with Azure App Gateway with Ingres controller (AGIC) - planned
+- [Azure Container Instances with Azure Files](#azure-container-instances-with-azure-files).
+- Azure Container Instances with Azure Files and Azure Front Door - planned.
+- Azure App Service for Linux Containers and Azure Files - planned.
+- Azure Kubernetes Service with Azure App Gateway with Ingres controller (AGIC) - planned.
 - Azure Virtual Machines - not planned as there are other projects that covers this architecture.
 
 > IMPORTANT NOTE: You must have a valid [Foundry VTT license](https://foundryvtt.com/) attached to your account. If you don't have one, you can [buy one here](https://foundryvtt.com/purchase/).
