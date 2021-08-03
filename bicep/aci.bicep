@@ -29,9 +29,14 @@ param foundryAdminKey string
   'Standard_RAGZRS'
 ])
 param storageSku string = 'Standard_LRS'
+
+@description('The maximum amount of storage that will be allocated to Foundry VTT user data.')
 param storageShareQuota int = 10240
 
+@description('The number of CPU cores to assign to the Foundry VTT container.')
 param containerCpu int = 1
+
+@description('The amount of memory in GB to assign to the Foundry VTT container.')
 param containerMemoryInGB string = '1.5'
 
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {

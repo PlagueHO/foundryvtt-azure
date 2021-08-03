@@ -23,6 +23,9 @@ The following environment variables should be configured in the workflow to ensu
 - LOCATION: The Azure region to deploy the resources to. For example, `AustraliaEast`.
 - BASE_RESOURCE_NAME: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `dsrfoundryvtt`.
 - RESOURCE_GROUP_NAME: The name of the Azure resource group to create and add the resources to. For example, `dsr-foundryvtt-rg`.
+- STORAGE_SHARE_QUOTA: The maximum amount of storage that will be allocated to Foundry VTT user data.
+- CONTAINER_CPU: The number of CPU cores to assign to the Foundry VTT container.
+- CONTAINER_MEMORY_IN_GB: The amount of memory in GB to assign to the Foundry VTT container.
 
 The following GitHub Secrets need to be defined:
 

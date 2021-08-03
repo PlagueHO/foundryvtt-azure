@@ -9,6 +9,9 @@ env:
   LOCATION: AustraliaEast
   BASE_RESOURCE_NAME: dsrfoundryvtt
   RESOURCE_GROUP_NAME: dsr-foundryvtt-rg
+  STORAGE_SHARE_QUOTA: 5120
+  CONTAINER_CPU: 2
+  CONTAINER_MEMORY_IN_GB: 1.5
 
 jobs:
   deploy-azure-resources:
@@ -44,4 +47,8 @@ jobs:
                            resourceGroupName="$RESOURCE_GROUP_NAME" \
                            foundryUsername="$FOUNDRY_USERNAME" \
                            foundryPassword="$FOUNDRY_PASSWORD" \
-                           foundryAdminKey="$FOUNDRY_ADMIN_KEY"
+                           foundryAdminKey="$FOUNDRY_ADMIN_KEY" \
+                           storageShareQuota=$STORAGE_SHARE_QUOTA \
+                           containerCpu=$CONTAINER_CPU \
+                           containerMemoryInGB="$CONTAINER_MEMORY_IN_GB"
+
