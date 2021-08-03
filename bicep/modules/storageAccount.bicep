@@ -15,13 +15,13 @@ var storageConfigurationMap = {
     kind: 'FileStorage'
     sku: 'Premium_LRS'
     shareQuota: 5120
-    largeFileSharesState: 'Disabled'
+    largeFileSharesState: null
   }
   Standard_5GB: {
     kind: 'StorageV2'
     sku: 'Standard_LRS'
     shareQuota: 5120
-    largeFileSharesState: 'Disabled'
+    largeFileSharesState: null
   }
   Standard_10GB: {
     kind: 'StorageV2'
