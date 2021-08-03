@@ -47,6 +47,6 @@ jobs:
                            foundryUsername="$FOUNDRY_USERNAME" \
                            foundryPassword="$FOUNDRY_PASSWORD" \
                            foundryAdminKey="$FOUNDRY_ADMIN_KEY" \
-                           storageConfugration="$STORAGE_CONFUGRATION" \
+                           storageConfiguration="$STORAGE_CONFIGURATION" \
                            containerConfiguration="$CONTAINER_CONFIGURATION"
 
