@@ -35,10 +35,10 @@ param storageSku string = 'Premium_LRS'
 param storageShareQuota int = 5120
 
 @description('The number of CPU cores to assign to the Foundry VTT container.')
-param containerCpu int = 1
+param containerCpu int = 2
 
 @description('The amount of memory in GB to assign to the Foundry VTT container.')
-param containerMemoryInGB string = '1.5'
+param containerMemoryInGB string = '2'
 
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName

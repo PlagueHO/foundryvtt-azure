@@ -9,8 +9,8 @@ env:
   LOCATION: AustraliaEast
   STORAGE_SKU: Premium_LRS
   STORAGE_SHARE_QUOTA: 5120
-  CONTAINER_CPU: 1
-  CONTAINER_MEMORY_IN_GB: 1.5
+  CONTAINER_CPU: 2
+  CONTAINER_MEMORY_IN_GB: 2
 
 jobs:
   deploy-azure-resources:

@@ -3,8 +3,8 @@ param storageAccountName string
 param shareName string = 'foundryvttdata'
 param containerGroupName string
 param containerDnsName string
-param containerCpu int = 1
-param containerMemoryInGB string = '1.5'
+param containerCpu int = 2
+param containerMemoryInGB string = '2'
 
 @secure()
 param foundryUsername string
