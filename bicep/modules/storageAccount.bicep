@@ -11,7 +11,7 @@ param storageShareName string = 'foundryvttdata'
   'Standard_GZRS'
   'Standard_RAGZRS'
 ])
-param storageSku string = 'Standard_LRS'
+param storageSku string = 'Premium_LRS'
 param storageShareQuota int = 10240
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
