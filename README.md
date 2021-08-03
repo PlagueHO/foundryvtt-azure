@@ -18,7 +18,7 @@ This method will deploy an [Azure Container Instance](https://docs.microsoft.com
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
-The workflow for this deployment can be found in [.github\workflows\deploy-azure-container-instance.yml](.github\workflows\deploy-azure-container-instance.yml).
+The workflow for this deployment can be found in [.github\workflows\deploy-aci.yml](.github\workflows\deploy-aci.yml).
 
 The following environment variables should be configured in the workflow to ensure that resource names for Storage Account and Container DNS are globally unique:
 
