@@ -12,7 +12,9 @@ param storageShareName string = 'foundryvttdata'
   'Standard_RAGZRS'
 ])
 param storageSku string = 'Premium_LRS'
-param storageShareQuota int = 10240
+
+@maxValue(5120)
+param storageShareQuota int = 5120
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   name: storageAccountName
@@ -24,7 +26,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   properties: {
     accessTier: 'Hot'
     allowSharedKeyAccess: true
-    largeFileSharesState: 'Enabled'
   }
 
   resource symbolicname 'fileServices@2021-02-01' = {

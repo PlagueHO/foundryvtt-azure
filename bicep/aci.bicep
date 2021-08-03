@@ -28,10 +28,11 @@ param foundryAdminKey string
   'Standard_GZRS'
   'Standard_RAGZRS'
 ])
-param storageSku string = 'Standard_LRS'
+param storageSku string = 'Premium_LRS'
 
 @description('The maximum amount of storage that will be allocated to Foundry VTT user data.')
-param storageShareQuota int = 10240
+@maxValue(5120)
+param storageShareQuota int = 5120
 
 @description('The number of CPU cores to assign to the Foundry VTT container.')
 param containerCpu int = 1
