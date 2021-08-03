@@ -2,6 +2,8 @@
 
 Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (that you've purchased a license for) to Azure using Azure Bicep and GitHub Actions.
 
+The project uses GitHub actions to deploy the resources to Azure using the [GitHub Action Azure CLI task](https://github.com/marketplace/actions/azure-cli-action) and [Azure Bicep](https://aka.ms/Bicep).
+
 This repository will deploy a Foundry Virtual Table top using various different methods to suit your requirements:
 
 - [Azure Container Instances with Azure Files](#azure-container-instances-with-azure-files)
@@ -10,7 +12,7 @@ This repository will deploy a Foundry Virtual Table top using various different 
 
 ## Azure Container Instances with Azure Files
 
-[![deploy-azure-container-instance](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-azure-container-instance.yml/badge.svg)](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-azure-container-instance.yml)
+[![deploy-aci](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-aci.yml/badge.svg)](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-aci.yml)
 
 This method will deploy an [Azure Container Instance](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-overview) and attach an Azure Storage account with an SMB share for persistent storage.
 
@@ -22,7 +24,7 @@ The following environment variables should be configured in the workflow to ensu
 
 - LOCATION: The Azure region to deploy the resources to. For example, `AustraliaEast`.
 - STORAGE_CONFIGURATION: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_5GB`, `Standard_5GB`, `Standard_10GB` or `Standard_20GB`.
-- CONTAINER_CONFIGURATION: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of 'Small', 'Medium' or 'Large'.
+- CONTAINER_CONFIGURATION: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of `Small`, `Medium` or `Large`.
 
 The following GitHub Secrets need to be defined:
 
