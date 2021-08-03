@@ -7,10 +7,8 @@ on:
 
 env:
   LOCATION: AustraliaEast
-  STORAGE_SKU: Premium_LRS
-  STORAGE_SHARE_QUOTA: 5120
-  CONTAINER_CPU: 2
-  CONTAINER_MEMORY_IN_GB: 2
+  STORAGE_CONFIGURATION: Premium_5GB
+  CONTAINER_CONFIGURATION: Small
 
 jobs:
   deploy-azure-resources:
@@ -49,8 +47,6 @@ jobs:
                            foundryUsername="$FOUNDRY_USERNAME" \
                            foundryPassword="$FOUNDRY_PASSWORD" \
                            foundryAdminKey="$FOUNDRY_ADMIN_KEY" \
-                           storageSku="$STORAGE_SKU" \
-                           storageShareQuota=$STORAGE_SHARE_QUOTA \
-                           containerCpu=$CONTAINER_CPU \
-                           containerMemoryInGB="$CONTAINER_MEMORY_IN_GB"
+                           storageConfugration="$STORAGE_CONFUGRATION" \
+                           containerConfiguration="$CONTAINER_CONFIGURATION"
 

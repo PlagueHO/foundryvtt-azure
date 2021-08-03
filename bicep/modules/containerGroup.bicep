@@ -3,8 +3,13 @@ param storageAccountName string
 param shareName string = 'foundryvttdata'
 param containerGroupName string
 param containerDnsName string
-param containerCpu int = 2
-param containerMemoryInGB string = '2'
+
+@allowed([
+  'Small'
+  'Medium'
+  'Large'
+])
+param containerConfiguration string = 'Small'
 
 @secure()
 param foundryUsername string
@@ -14,6 +19,21 @@ param foundryPassword string
 
 @secure()
 param foundryAdminKey string
+
+var containerConfigurationMap = {
+  Small: {
+    memoryInGB: '1.5'
+    cpu: 1
+  }
+  Medium: {
+    memoryInGB: '2'
+    cpu: 2
+  }
+  Large: {
+    memoryInGB: '3'
+    cpu: 4
+  }
+}
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
@@ -50,8 +70,8 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
           ]
           resources: {
             requests: {
-              memoryInGB: any(containerMemoryInGB)
-              cpu: containerCpu
+              memoryInGB: any(containerConfigurationMap[containerConfiguration].memoryInGB)
+              cpu: containerConfigurationMap[containerConfiguration].cpu
             }
           }
           volumeMounts: [

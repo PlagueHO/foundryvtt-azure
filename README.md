@@ -21,10 +21,8 @@ The workflow for this deployment can be found in [.github\workflows\deploy-azure
 The following environment variables should be configured in the workflow to ensure that resource names for Storage Account and Container DNS are globally unique:
 
 - LOCATION: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- STORAGE_SKU: The Azure Storage SKU to use for storing Foundry VTT user data.
-- STORAGE_SHARE_QUOTA: The maximum amount of storage that will be allocated to Foundry VTT user data.
-- CONTAINER_CPU: The number of CPU cores to assign to the Foundry VTT container.
-- CONTAINER_MEMORY_IN_GB: The amount of memory in GB to assign to the Foundry VTT container.
+- STORAGE_CONFIGURATION: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_5GB`, `Standard_5GB`, `Standard_10GB` or `Standard_20GB`.
+- CONTAINER_CONFIGURATION: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of 'Small', 'Medium' or 'Large'.
 
 The following GitHub Secrets need to be defined:
 

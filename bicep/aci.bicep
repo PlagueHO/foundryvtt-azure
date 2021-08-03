@@ -18,27 +18,22 @@ param foundryPassword string
 @secure()
 param foundryAdminKey string
 
-@description('The storage account SKU to use to store the Foundry VTT user data.')
+@description('The configuration of the Azure Storage SKU to use for storing Foundry VTT user data.')
 @allowed([
-  'Standard_LRS'
-  'Standard_RAGRS'
-  'Standard_ZRS'
-  'Premium_LRS'
-  'Premium_ZRS'
-  'Standard_GZRS'
-  'Standard_RAGZRS'
+  'Premium_5GB'
+  'Standard_5GB'
+  'Standard_10GB'
+  'Standard_20GB'
 ])
-param storageSku string = 'Premium_LRS'
+param storageConfiguration string = 'Premium_5GB'
 
-@description('The maximum amount of storage that will be allocated to Foundry VTT user data.')
-@maxValue(5120)
-param storageShareQuota int = 5120
-
-@description('The number of CPU cores to assign to the Foundry VTT container.')
-param containerCpu int = 2
-
-@description('The amount of memory in GB to assign to the Foundry VTT container.')
-param containerMemoryInGB string = '2'
+@description('The configuration of the Azure Container Instance for running the Foundry VTT server.')
+@allowed([
+  'Small'
+  'Medium'
+  'Large'
+])
+param containerConfiguration string = 'Small'
 
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName
@@ -51,8 +46,7 @@ module storageAccount './modules/storageAccount.bicep' = {
   params: {
     location: location
     storageAccountName: baseResourceName
-    storageSku: storageSku
-    storageShareQuota: storageShareQuota
+    storageConfiguration: storageConfiguration
   }
 }
 
@@ -70,8 +64,7 @@ module containerGroup './modules/containerGroup.bicep' = {
     foundryUsername: foundryUsername
     foundryPassword: foundryPassword
     foundryAdminKey: foundryAdminKey
-    containerCpu: containerCpu
-    containerMemoryInGB: containerMemoryInGB
+    containerConfiguration: containerConfiguration
   }
 }
 
