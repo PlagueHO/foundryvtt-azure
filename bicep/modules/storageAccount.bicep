@@ -24,6 +24,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   properties: {
     accessTier: 'Hot'
     allowSharedKeyAccess: true
+    largeFileSharesState: 'Enabled'
   }
 
   resource symbolicname 'fileServices@2021-02-01' = {
@@ -33,7 +34,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
       name: storageShareName
       properties: {
         enabledProtocols: 'SMB'
-        // shareQuota: storageShareQuota
+        shareQuota: storageShareQuota
       }
     }
   }

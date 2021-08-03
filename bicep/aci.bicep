@@ -29,7 +29,7 @@ param foundryAdminKey string
   'Standard_RAGZRS'
 ])
 param storageSku string = 'Standard_LRS'
-// param storageShareQuota int = 10240
+param storageShareQuota int = 10240
 
 param containerCpu int = 1
 param containerMemoryInGB string = '1.5'
@@ -46,7 +46,7 @@ module storageAccount './modules/storageAccount.bicep' = {
     location: location
     storageAccountName: baseResourceName
     storageSku: storageSku
-    // storageShareQuota: storageShareQuota
+    storageShareQuota: storageShareQuota
   }
 }
 
