@@ -1,5 +1,6 @@
 param location string
 param appServicePlanId string
+param storageAccountName string
 param webAppName string
 
 @secure()
@@ -24,6 +25,18 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
       linuxFxVersion: linuxFxVersion
       appSettings: [
         {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: ''
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://index.docker.io/v1'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: ''
+        }
+        {
           name: 'FOUNDRY_USERNAME'
           value: foundryUsername
         }
@@ -36,12 +49,28 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
           value: foundryAdminKey
         }
         {
-          name: 'DOCKER_REGISTRY_SERVER_URL'
-          value: 'https://index.docker.io/v1'
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
         }
       ]
     }
   }
+
+  resource config 'config@2021-01-15' = {
+    name: 'web'
+    properties: {
+      linuxFxVersion: linuxFxVersion
+      azureStorageAccounts: {
+        foundrydata: {
+          type: 'AzureFiles'
+          accountName: storageAccountName
+          shareName: 'foundryvttdata'
+          mountPath: '/data'
+        }
+      }
+    }
+  }
+
 }
 
 output url string = 'https://${webAppName}.azurewebsites.net'

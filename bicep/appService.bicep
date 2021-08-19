@@ -81,6 +81,7 @@ module webAppFoundryVtt './modules/webAppFoundryVtt.bicep' = {
   params: {
     location: location
     appServicePlanId: appServicePlan.outputs.appServicePlanId
+    storageAccountName: baseResourceName
     webAppName: baseResourceName
     foundryUsername: foundryUsername
     foundryPassword: foundryPassword
