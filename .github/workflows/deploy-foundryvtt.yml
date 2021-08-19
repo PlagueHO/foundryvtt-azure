@@ -41,7 +41,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Container Instance
-        if: ${{ TYPE == 'ACI' }}
+        if: ${{ env.TYPE == 'ACI' }}
         uses: azure/CLI@v1
         with:
           azcliversion: 2.24.2
@@ -62,7 +62,7 @@ jobs:
                            containerConfiguration="$CONTAINER_CONFIGURATION"
 
       - name: Deploy to Azure App Service
-        if: ${{ TYPE == 'AAS' }}
+        if: ${{ env.TYPE == 'AAS' }}
         uses: azure/CLI@v1
         with:
           azcliversion: 2.24.2
