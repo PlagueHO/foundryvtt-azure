@@ -29,13 +29,20 @@ param foundryAdminKey string
 ])
 param storageConfiguration string = 'Premium_10GB'
 
-@description('The configuration of the Azure Container Instance for running the Foundry VTT server.')
+@description('The Azure App Service SKU for running the Foundry VTT server and optionally the DDB-Proxy.')
 @allowed([
-  'Small'
-  'Medium'
-  'Large'
+  'B1'
+  'P1V2'
+  'P2V2'
+  'P3V2'
+  'P1V3'
+  'P2V3'
+  'P3V3'
 ])
-param containerConfiguration string = 'Small'
+param appServicePlanConfiguration string = 'P1V2'
+
+@description('Deploy a D&D Beyond proxy into the app service plan.')
+param deployDdbProxy bool = false
 
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName
@@ -52,22 +59,30 @@ module storageAccount './modules/storageAccount.bicep' = {
   }
 }
 
-module containerGroup './modules/containerGroup.bicep' = {
-  name: 'containerGroup'
+module appServicePlan './modules/appServicePlan.bicep' = {
+  name: 'appServicePlan'
   scope: rg
   dependsOn: [
     storageAccount
   ]
   params: {
     location: location
-    storageAccountName: baseResourceName
-    containerGroupName: '${baseResourceName}-aci'
-    containerDnsName: baseResourceName
-    foundryUsername: foundryUsername
-    foundryPassword: foundryPassword
-    foundryAdminKey: foundryAdminKey
-    containerConfiguration: containerConfiguration
+    appServicePlanName: '${baseResourceName}-asp'
+    appServicePlanConfiguration: appServicePlanConfiguration
   }
 }
 
-output url string = containerGroup.outputs.url
+module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
+  name: 'webAppDdbProxy'
+  scope: rg
+  dependsOn: [
+    appServicePlan
+  ]
+  params: {
+    location: location
+    appServicePlanId: appServicePlan.outputs.appServicePlanId
+    webAppName: baseResourceName
+  }
+}
+
+output ddbproxyrl string = webAppDdbProxy.outputs.url

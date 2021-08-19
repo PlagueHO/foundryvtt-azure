@@ -4,11 +4,13 @@ param storageShareName string = 'foundryvttdata'
 
 @allowed([
   'Premium_5GB'
+  'Premium_10GB'
+  'Premium_20GB'
   'Standard_5GB'
   'Standard_10GB'
   'Standard_20GB'
 ])
-param storageConfiguration string = 'Premium_5GB'
+param storageConfiguration string = 'Premium_10GB'
 
 var storageConfigurationMap = {
   Premium_5GB: {
@@ -16,6 +18,18 @@ var storageConfigurationMap = {
     sku: 'Premium_LRS'
     shareQuota: 5120
     largeFileSharesState: null
+  }
+  Premium_10GB: {
+    kind: 'FileStorage'
+    sku: 'Premium_LRS'
+    shareQuota: 10240
+    largeFileSharesState: 'Enabled'
+  }
+  Premium_20GB: {
+    kind: 'FileStorage'
+    sku: 'Premium_LRS'
+    shareQuota: 20480
+    largeFileSharesState: 'Enabled'
   }
   Standard_5GB: {
     kind: 'StorageV2'

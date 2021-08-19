@@ -1,4 +1,4 @@
-name: deploy-aci
+name: deploy-foundryvtt
 
 on:
   push:
@@ -7,8 +7,18 @@ on:
 
 env:
   LOCATION: AustraliaEast
-  STORAGE_CONFIGURATION: Premium_5GB
+  STORAGE_CONFIGURATION: Premium_10GB
+  # The type of Azure service to deploy the resources to.
+  # ACI = Azure Container Instance
+  # AAS = Azure App Service (Web App)
+  TYPE: 'AAS'
+
+  # Only required if TYPE is ACI
   CONTAINER_CONFIGURATION: Small
+
+  # Only required if TYPE is AAS
+  APPSERVICEPLAN_CONFIGURATION: P1V2
+  DEPLOY_DDBPROXY: true
 
 jobs:
   deploy-azure-resources:
@@ -30,7 +40,8 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Apply Bicep
+      - name: Deploy to Azure Container Instance
+        if: ${{ TYPE == 'ACI' }}
         uses: azure/CLI@v1
         with:
           azcliversion: 2.24.2
@@ -49,4 +60,26 @@ jobs:
                            foundryAdminKey="$FOUNDRY_ADMIN_KEY" \
                            storageConfiguration="$STORAGE_CONFIGURATION" \
                            containerConfiguration="$CONTAINER_CONFIGURATION"
+
+      - name: Deploy to Azure App Service
+        if: ${{ TYPE == 'AAS' }}
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.24.2
+          inlineScript: |
+            az account show
+            date=$(date +"%Y%m%d%H%M")
+            az deployment sub create \
+              --name "foundryvtt-aci-${date}" \
+              --location $LOCATION \
+              --template-file bicep/aci.bicep \
+              --parameters location="$LOCATION" \
+                           baseResourceName="$BASE_RESOURCE_NAME" \
+                           resourceGroupName="$RESOURCE_GROUP_NAME" \
+                           foundryUsername="$FOUNDRY_USERNAME" \
+                           foundryPassword="$FOUNDRY_PASSWORD" \
+                           foundryAdminKey="$FOUNDRY_ADMIN_KEY" \
+                           storageConfiguration="$STORAGE_CONFIGURATION" \
+                           appServicePlanConfiguration="$APPSERVICEPLAN_CONFIGURATION" \
+                           deployDdbProxy="$DEPLOY_DDBPROXY"
 
