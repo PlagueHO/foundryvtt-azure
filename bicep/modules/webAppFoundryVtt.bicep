@@ -35,6 +35,10 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
           name: 'FOUNDRY_ADMIN_KEY'
           value: foundryAdminKey
         }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://index.docker.io/v1'
+        }
       ]
     }
   }
