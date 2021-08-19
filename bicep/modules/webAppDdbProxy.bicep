@@ -10,6 +10,7 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
   kind: 'app,linux,container'
   properties: {
     serverFarmId: appServicePlanId
+    httpsOnly: true
     siteConfig: {
       numberOfWorkers: 1
       linuxFxVersion: linuxFxVersion
