@@ -70,9 +70,9 @@ jobs:
             az account show
             date=$(date +"%Y%m%d%H%M")
             az deployment sub create \
-              --name "foundryvtt-aci-${date}" \
+              --name "foundryvtt-aas-${date}" \
               --location $LOCATION \
-              --template-file bicep/aci.bicep \
+              --template-file bicep/appService.bicep \
               --parameters location="$LOCATION" \
                            baseResourceName="$BASE_RESOURCE_NAME" \
                            resourceGroupName="$RESOURCE_GROUP_NAME" \
