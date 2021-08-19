@@ -101,4 +101,5 @@ module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
   }
 }
 
-output ddbproxyrl string = webAppDdbProxy.outputs.url
+output url string = webAppFoundryVtt.outputs.url
+output ddbproxyurl string = webAppDdbProxy.outputs.url
