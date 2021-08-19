@@ -2,6 +2,8 @@ param location string
 param appServicePlanId string
 param webAppName string
 
+var linuxFxVersion = 'DOCKER|ghcr.io/mrprimate/ddb-proxy:latest'
+
 resource webApp 'Microsoft.Web/sites@2021-01-15' = {
   name: webAppName
   location: location
@@ -10,9 +12,9 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
     serverFarmId: appServicePlanId
     siteConfig: {
       numberOfWorkers: 1
-      linuxFxVersion: 'DOCKER|ghcr.io/mrprimate/ddb-proxy:latest'
+      linuxFxVersion: linuxFxVersion
     }
   }
 }
 
-output url string = 'https://${webApp.properties.hostNames}'
+output url string = 'https://${webAppName}.azurewebsites.net'

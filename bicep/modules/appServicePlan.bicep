@@ -68,6 +68,10 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2021-01-15' = {
     family: appServicePlanSkuConfigurationMap[appServicePlanConfiguration].family
     capacity: 1
   }
+  properties: {
+    isXenon: false
+    hyperV: false
+  }
 }
 
 output appServicePlanId string = appServicePlan.id

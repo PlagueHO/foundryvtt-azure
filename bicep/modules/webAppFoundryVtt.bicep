@@ -2,6 +2,17 @@ param location string
 param appServicePlanId string
 param webAppName string
 
+@secure()
+param foundryUsername string
+
+@secure()
+param foundryPassword string
+
+@secure()
+param foundryAdminKey string
+
+var linuxFxVersion = 'DOCKER|felddy/foundryvtt:release'
+
 resource webApp 'Microsoft.Web/sites@2021-01-15' = {
   name: webAppName
   location: location
@@ -10,9 +21,23 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
     serverFarmId: appServicePlanId
     siteConfig: {
       numberOfWorkers: 1
-      linuxFxVersion: 'DOCKER|felddy/foundryvtt:release'
+      linuxFxVersion: linuxFxVersion
+      appSettings: [
+        {
+          name: 'FOUNDRY_USERNAME'
+          value: foundryUsername
+        }
+        {
+          name: 'FOUNDRY_PASSWORD'
+          value: foundryPassword
+        }
+        {
+          name: 'FOUNDRY_ADMIN_KEY'
+          value: foundryAdminKey
+        }
+      ]
     }
   }
 }
 
-output url string = 'https://${webApp.properties.hostNames}'
+output url string = 'https://${webAppName}.azurewebsites.net'

@@ -72,6 +72,22 @@ module appServicePlan './modules/appServicePlan.bicep' = {
   }
 }
 
+module webAppFoundryVtt './modules/webAppFoundryVtt.bicep' = {
+  name: 'webAppFoundryVtt'
+  scope: rg
+  dependsOn: [
+    appServicePlan
+  ]
+  params: {
+    location: location
+    appServicePlanId: appServicePlan.outputs.appServicePlanId
+    webAppName: baseResourceName
+    foundryUsername: foundryUsername
+    foundryPassword: foundryPassword
+    foundryAdminKey: foundryAdminKey
+  }
+}
+
 module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
   name: 'webAppDdbProxy'
   scope: rg
@@ -81,7 +97,7 @@ module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
   params: {
     location: location
     appServicePlanId: appServicePlan.outputs.appServicePlanId
-    webAppName: baseResourceName
+    webAppName: '${baseResourceName}ddbproxy'
   }
 }
 
