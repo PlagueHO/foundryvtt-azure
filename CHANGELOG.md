@@ -8,3 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added support for deploying to App Service Plans.
+
+### Changed
+
+- Changed the container start up limit in the Web App deployment to 1800 seconds (maximum) to account for additional start-up time with many modules.
