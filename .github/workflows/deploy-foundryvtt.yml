@@ -7,7 +7,7 @@ on:
 
 env:
   LOCATION: AustraliaEast
-  STORAGE_CONFIGURATION: Premium_10GB
+  STORAGE_CONFIGURATION: Premium_100GB
   # The type of Azure service to deploy the resources to.
   # ACI = Azure Container Instance
   # AAS = Azure App Service (Web App)

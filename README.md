@@ -29,7 +29,7 @@ It uses the `felddy/foundryvtt:release` container image from Docker Hub. The sou
 The following environment variables should be configured in the workflow to define the region to deploy to and the storage and container configuration:
 
 - `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_5GB`, `Premium_10GB`, `Premium_20GB`, `Standard_5GB`, `Standard_10GB` or `Standard_20GB`.
+- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
 - `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P1V3`, `P2V3`, `P3V3`.
 
 The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Web App DNS are globally unique and provide access to your Azure subscription for deployment:
@@ -65,7 +65,7 @@ It uses the `felddy/foundryvtt:release` container image from Docker Hub. The sou
 The following environment variables should be configured in the workflow to define the region to deploy to and the storage and container configuration:
 
 - `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_5GB`, `Premium_10GB`, `Premium_20GB`, `Standard_5GB`, `Standard_10GB` or `Standard_20GB`.
+- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
 - `CONTAINER_CONFIGURATION`: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of `Small`, `Medium` or `Large`.
 
 The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Container DNS are globally unique and provide access to your Azure subscription for deployment:
