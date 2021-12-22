@@ -74,11 +74,11 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
           accountName: storageAccountName
           shareName: 'foundryvttdata'
           mountPath: '/data'
+          accessKey: listkeys(resourceId('Microsoft.Storage/storageAccounts', storageAccountName), '2021-04-01').keys[0].value
         }
       }
     }
   }
-
 }
 
 output url string = 'https://${webAppName}.azurewebsites.net'
