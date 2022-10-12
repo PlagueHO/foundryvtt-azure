@@ -22,7 +22,7 @@ The available architectures are (prefixed by the `TYPE` value to provide in the 
 
 ## Azure App Service for Linux Containers and Azure Files
 
-This method will deploy an [Azure App Service Web App running Linux Containers](https://docs.microsoft.com/en-us/azure/app-service/configure-custom-container) and attach an Azure Storage account with an SMB share for persistent storage.
+This method will deploy an [Azure App Service Web App running Linux Containers](https://learn.microsoft.com/azure/app-service/configure-custom-container) and attach an Azure Storage account with an SMB share for persistent storage.
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
@@ -34,7 +34,9 @@ The following environment variables should be configured in the workflow to defi
 
 The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Web App DNS are globally unique and provide access to your Azure subscription for deployment:
 
-- `AZURE_CREDENTIALS`: Created as per [this document](https://github.com/marketplace/actions/azure-cli-action#configure-azure-credentials-as-github-secret).
+- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
+- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
+- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
 - `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
 - `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `FOUNDRY_USERNAME`: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release` container image.
@@ -58,7 +60,7 @@ game.settings.set("ddb-importer", "api-endpoint", "https://<BASE_RESOURCE_NAME>d
 
 ## Azure Container Instances with Azure Files
 
-This method will deploy an [Azure Container Instance](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-overview) and attach an Azure Storage account with an SMB share for persistent storage.
+This method will deploy an [Azure Container Instance](https://learn.microsoft.com/azure/container-instances/container-instances-overview) and attach an Azure Storage account with an SMB share for persistent storage.
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
@@ -70,6 +72,9 @@ The following environment variables should be configured in the workflow to defi
 
 The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Container DNS are globally unique and provide access to your Azure subscription for deployment:
 
+- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
+- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
+- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
 - `AZURE_CREDENTIALS`: Created as per [this document](https://github.com/marketplace/actions/azure-cli-action#configure-azure-credentials-as-github-secret).
 - `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
 - `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
@@ -78,3 +83,31 @@ The following GitHub Secrets need to be defined to ensure that resource names fo
 - `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
 
 These values should be kept secret and care taken to ensure they are not shared with anyone.
+
+## Configuring Workload Identity Federation for GitHub Actions workflow
+
+Customize and run this code in Azure Cloud Shell to create the credential for the GitHub workflow to use to deploy to Azure.
+[Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation) will be used by GitHub Actions to authenticate to Azure.
+
+```powershell
+$credentialname = '<The name to use for the credential & app>' # e.g., github-dsrfoundryvtt-workflow
+$application = New-AzADApplication -DisplayName $credentialname
+$policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main" # e.g., repo:DsrDemoOrg/foundryvtt-azure:ref:refs/heads/main
+$subscriptionId = '<your Azure subscription>'
+
+New-AzADAppFederatedCredential `
+    -Name $credentialname `
+    -ApplicationObjectId $application.Id `
+    -Issuer 'https://token.actions.githubusercontent.com' `
+    -Audience 'api://AzureADTokenExchange' `
+    -Subject $policy
+New-AzADServicePrincipal -AppId $application.AppId
+
+New-AzRoleAssignment `
+  -ApplicationId $application.AppId `
+  -RoleDefinitionName Contributor `
+  -Scope "/subscriptions/$subscriptionId" `
+  -Description "The deployment workflow for the foundry VTT."
+```
+
+To learn how to configure Workload Identity Federation with GitHub Actions, see [this Microsoft Learn Module](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
