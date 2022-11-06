@@ -27,7 +27,10 @@ param storageConfiguration string = 'Premium_100GB'
 
 @description('The Azure App Service SKU for running the Foundry VTT server and optionally the DDB-Proxy.')
 @allowed([
+  'F1'
   'B1'
+  'B2'
+  'B3'
   'P1V2'
   'P2V2'
   'P3V2'
@@ -35,7 +38,7 @@ param storageConfiguration string = 'Premium_100GB'
   'P2V3'
   'P3V3'
 ])
-param appServicePlanConfiguration string = 'P1V2'
+param appServicePlanConfiguration string = 'F1'
 
 @description('Deploy a D&D Beyond proxy into the app service plan.')
 param deployDdbProxy bool = false

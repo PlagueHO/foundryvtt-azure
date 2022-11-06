@@ -2,6 +2,7 @@ param location string
 param appServicePlanName string
 
 @allowed([
+  'F1'
   'B1'
   'B2'
   'B3'
@@ -12,7 +13,7 @@ param appServicePlanName string
   'P2V3'
   'P3V3'
 ])
-param appServicePlanConfiguration string = 'B1'
+param appServicePlanConfiguration string = 'F1'
 
 var appServicePlanSkuConfigurationMap = {
   F1: {
