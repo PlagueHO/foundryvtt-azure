@@ -3,6 +3,8 @@ param appServicePlanName string
 
 @allowed([
   'B1'
+  'B2'
+  'B3'
   'P1V2'
   'P2V2'
   'P3V2'
@@ -17,6 +19,18 @@ var appServicePlanSkuConfigurationMap = {
     name: 'B1'
     tier: 'Basic'
     size: 'B1'
+    family: 'B'
+  }
+  B2: {
+    name: 'B2'
+    tier: 'Basic'
+    size: 'B2'
+    family: 'B'
+  }
+  B3: {
+    name: 'B3'
+    tier: 'Basic'
+    size: 'B3'
     family: 'B'
   }
   P1V2: {
