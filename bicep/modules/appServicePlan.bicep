@@ -15,6 +15,12 @@ param appServicePlanName string
 param appServicePlanConfiguration string = 'B1'
 
 var appServicePlanSkuConfigurationMap = {
+  F1: {
+    name: 'F1'
+    tier: 'Free'
+    size: 'F1'
+    family: 'F'
+  }
   B1: {
     name: 'B1'
     tier: 'Basic'
