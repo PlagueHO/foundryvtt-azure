@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Change default App Service Plan to P1V2.
 - Converted App Service plan SKU to B3 and added support for B2 & B3.
 
 ## [0.3.0] - 2022-10-14
