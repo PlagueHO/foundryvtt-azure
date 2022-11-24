@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  LOCATION: AustraliaEast
+  LOCATION: EuropeNorth
   STORAGE_CONFIGURATION: Premium_100GB
   # The type of Azure service to deploy the resources to.
   # ACI = Azure Container Instance
@@ -22,7 +22,7 @@ env:
   CONTAINER_CONFIGURATION: Small
 
   # Only required if TYPE is AAS
-  APPSERVICEPLAN_CONFIGURATION: P1V2
+  APPSERVICEPLAN_CONFIGURATION: P2V3
   DEPLOY_DDBPROXY: true
 
 jobs:
