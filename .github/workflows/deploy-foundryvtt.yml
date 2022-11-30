@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  LOCATION: EuropeNorth
+  LOCATION: northeurope
   STORAGE_CONFIGURATION: Premium_100GB
   # The type of Azure service to deploy the resources to.
   # ACI = Azure Container Instance
