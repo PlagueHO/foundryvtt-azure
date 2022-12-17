@@ -49,16 +49,20 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
           name: 'FOUNDRY_ADMIN_KEY'
           value: foundryAdminKey
         }
-        {
-          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
-          value: 'false'
-        }
         // Set the container start time limit to max because Foundry VTT
         // container may take some time to start up depending on the number
         // of modules added.
         {
           name: 'WEBSITES_CONTAINER_START_TIME_LIMIT'
           value: '1800'
+        }
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
+        }
+        {
+          name: 'WEBSITES_PORT'
+          value: '30000'
         }
       ]
     }
