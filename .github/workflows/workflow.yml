@@ -10,21 +10,6 @@ permissions:
   id-token: write
   contents: read
 
-env:
-  LOCATION: ${{ vars.LOCATION }}
-  STORAGE_CONFIGURATION: ${{ vars.STORAGE_CONFIGURATION }}
-  # The type of Azure service to deploy the resources to.
-  # ACI = Azure Container Instance
-  # AAS = Azure App Service (Web App)
-  TYPE: ${{ vars.TYPE }}
-
-  # Only required if TYPE is ACI
-  CONTAINER_CONFIGURATION: ${{ vars.CONTAINER_CONFIGURATION }}
-
-  # Only required if TYPE is AAS
-  APPSERVICEPLAN_CONFIGURATION: ${{ vars.APPSERVICEPLAN_CONFIGURATION }}
-  DEPLOY_DDBPROXY: ${{ vars.DEPLOY_DDBPROXY }}
-
 jobs:
   deploy-aas:
     if: vars.Type == 'AAS'
@@ -52,7 +37,7 @@ jobs:
       BASE_RESOURCE_NAME: ${{ vars.BASE_RESOURCE_NAME }}
       RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
       STORAGE_CONFIGURATION: ${{ vars.STORAGE_CONFIGURATION }}
-      CONTAINER_CONFIGURATION: ${{ vars.$CONTAINER_CONFIGURATION }}
+      CONTAINER_CONFIGURATION: ${{ vars.CONTAINER_CONFIGURATION }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
