@@ -3,6 +3,9 @@ name: deploy-aas
 on:
   workflow_call:
     inputs:
+      LOCATION:
+        required: true
+        type: string
       BASE_RESOURCE_NAME:
         required: true
         type: string
@@ -12,10 +15,10 @@ on:
       STORAGE_CONFIGURATION:
         required: true
         type: string
-      CONTAINER_CONFIGURATION:
+      APPSERVICEPLAN_CONFIGURATION:
         required: true
         type: string
-      LOCATION:
+      DEPLOY_DDBPROXY:
         required: true
         type: string
     secrets:
