@@ -59,6 +59,7 @@ jobs:
           resourceGroupName: ${{ inputs.RESOURCE_GROUP_NAME }}
           template: ./bicep/appService.bicep
           region: ${{ inputs.LOCATION }}
+          scope: subscription
           parameters: >
             baseResourceName=${{ inputs.BASE_RESOURCE_NAME }}
             resourceGroupName=${{ inputs.RESOURCE_GROUP_NAME }}

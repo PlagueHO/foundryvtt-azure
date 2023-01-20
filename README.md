@@ -37,6 +37,9 @@ The following environment variables should be configured in the repository to de
 - `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
 - `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P1V3`, `P2V3`, `P3V3`.
 
+Your variables should look similar to this:
+![Example of GitHub Variables](/images/github-variables-example.png)
+
 The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Web App DNS are globally unique and provide access to your Azure subscription for deployment:
 
 - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
@@ -47,12 +50,14 @@ The following GitHub Secrets need to be defined to ensure that resource names fo
 - `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
 
 These values should be kept secret and care taken to ensure they are not shared with anyone.
+Your secrets should look like this:
+![Example of GitHub Secrets](/images/github-secrets-example.png)
 
 ### DDB-Proxy
 
 The workflow will also optionally deploy a [DDB-Proxy](https://github.com/MrPrimate/ddb-proxy) into the App Service Plan for use with the awesome [DDB-Importer](https://github.com/MrPrimate/ddb-importer) plugin for Foundry VTT.
 
-- `DEPLOY_DDBPROXY`: Setting this to true will deploy a DDB-Proxy into the same App Service Plan as the Foundry VTT server, but on a different URL.
+- `DEPLOY_DDBPROXY`: Setting this variable to true will deploy a DDB-Proxy into the same App Service Plan as the Foundry VTT server, but on a different URL.
 
 Once you have deployed a DDB-Proxy into your App Service Plan you will be able to configure your Foundry VTT to use it by running the following commands in your browsers developer console:
 
@@ -89,6 +94,10 @@ The following GitHub Secrets need to be defined to ensure that resource names fo
 - `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
 
 These values should be kept secret and care taken to ensure they are not shared with anyone.
+
+Your secrets should look like this:
+![Example of GitHub Secrets](/images/github-secrets-example.png)
+
 
 ## Configuring Workload Identity Federation for GitHub Actions workflow
 
