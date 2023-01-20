@@ -4,9 +4,11 @@
 
 Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (that you've purchased a license for) to Azure using Azure Bicep and GitHub Actions.
 
-The project uses GitHub actions to deploy the resources to Azure using the [GitHub Action Azure CLI task](https://github.com/marketplace/actions/azure-cli-action) and [Azure Bicep](https://aka.ms/Bicep).
+The project uses GitHub actions to deploy the resources to Azure using the [GitHub Action for Azure Resource Manager (ARM) deployment task](https://github.com/Azure/arm-deploy) and [Azure Bicep](https://aka.ms/Bicep).
 
 This repository will deploy a Foundry Virtual Table top using various different Azure architectures to suit your requirements. The compute and storage is separated into different services to enable update and redeployment of the server without loss of the Foundry VTT data.
+
+> IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [this document](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) for details on how to set this up.
 
 You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
 
@@ -26,9 +28,12 @@ This method will deploy an [Azure App Service Web App running Linux Containers](
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
-The following environment variables should be configured in the workflow to define the region to deploy to and the storage and container configuration:
+The following environment variables should be configured in the repository to define the region to deploy to and the storage and container configuration:
 
+- `TYPE`: Should be set to `ASS` to deploy the Azure App Service for Linux Containers and Azure Files architecture.
 - `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
+- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
+- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
 - `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P1V3`, `P2V3`, `P3V3`.
 
@@ -37,8 +42,6 @@ The following GitHub Secrets need to be defined to ensure that resource names fo
 - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
 - `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
 - `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
-- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `FOUNDRY_USERNAME`: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release` container image.
 - `FOUNDRY_PASSWORD`: Your Foundry VTT password. This is used by the `felddy/foundryvtt:release` container image.
 - `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
@@ -64,9 +67,12 @@ This method will deploy an [Azure Container Instance](https://learn.microsoft.co
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
-The following environment variables should be configured in the workflow to define the region to deploy to and the storage and container configuration:
+The following variables should be configured in the repository to define the region to deploy to and the storage and container configuration:
 
+- `TYPE`: Should be set to `ACI` to deploy an Azure Container Instance.
 - `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
+- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
+- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
 - `CONTAINER_CONFIGURATION`: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of `Small`, `Medium` or `Large`.
 
