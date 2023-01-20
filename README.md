@@ -8,7 +8,7 @@ The project uses GitHub actions to deploy the resources to Azure using the [GitH
 
 This repository will deploy a Foundry Virtual Table top using various different Azure architectures to suit your requirements. The compute and storage is separated into different services to enable update and redeployment of the server without loss of the Foundry VTT data.
 
-> IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [this document](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) for details on how to set this up.
+> IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [Configuring Workload Identity Federation for GitHub Actions workflow](#configuring-workload-identity-federation-for-github-actions-workflow) for more information.
 
 You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
 
@@ -98,7 +98,6 @@ These values should be kept secret and care taken to ensure they are not shared 
 Your secrets should look like this:
 ![Example of GitHub Secrets](/images/github-secrets-example.png)
 
-
 ## Configuring Workload Identity Federation for GitHub Actions workflow
 
 Customize and run this code in Azure Cloud Shell to create the credential for the GitHub workflow to use to deploy to Azure.
@@ -126,3 +125,4 @@ New-AzRoleAssignment `
 ```
 
 To learn how to configure Workload Identity Federation with GitHub Actions, see [this Microsoft Learn Module](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
+Please see [this document](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) for more information on Workload Identities.
