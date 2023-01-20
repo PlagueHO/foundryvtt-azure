@@ -1,6 +1,6 @@
 # foundryvtt-azure
 
-[![deploy-foundryvtt](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml/badge.svg)](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml)
+[![deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml/badge.svg)](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml)
 
 Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (that you've purchased a license for) to Azure using Azure Bicep and GitHub Actions.
 
