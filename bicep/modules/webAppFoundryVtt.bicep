@@ -49,6 +49,10 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
           name: 'FOUNDRY_ADMIN_KEY'
           value: foundryAdminKey
         }
+        {
+          name: 'FOUNDRY_MINIFY_STATIC_FILES'
+          value: 'true'
+        }
         // Set the container start time limit to max because Foundry VTT
         // container may take some time to start up depending on the number
         // of modules added.
