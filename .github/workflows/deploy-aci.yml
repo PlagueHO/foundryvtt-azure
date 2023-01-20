@@ -1,0 +1,67 @@
+name: deploy-aci
+
+on:
+  workflow_call:
+    inputs:
+      BASE_RESOURCE_NAME:
+        required: true
+        type: string
+      RESOURCE_GROUP_NAME:
+        required: true
+        type: string
+      STORAGE_CONFIGURATION:
+        required: true
+        type: string
+      CONTAINER_CONFIGURATION:
+        required: true
+        type: string
+      LOCATION:
+        required: true
+        type: string
+    secrets:
+      FOUNDRY_USERNAME:
+        required: true
+      FOUNDRY_PASSWORD:
+        required: true
+      FOUNDRY_ADMIN_KEY:
+        required: true
+
+jobs:
+  deploy-azure-resources:
+    runs-on: ubuntu-latest
+    name: Create Azure Resources
+    env:
+      BASE_RESOURCE_NAME: ${{ secrets.BASE_RESOURCE_NAME }}
+      RESOURCE_GROUP_NAME: ${{ secrets.RESOURCE_GROUP_NAME }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Container Instance
+        uses: azure/arm-deploy@v1
+        with:
+          failOnStdErr: false
+          deploymentName: ${{ github.run_number }}
+          resourceGroupName: ${{ inputs.resourceGroupName }}
+          template: ./bicep/appService.bicep
+          region: ${{ inputs.location }}
+          abs: ${{inputs.location }}
+          parameters: >
+            baseResourceName=${{ inputs.BASE_RESOURCE_NAME }}
+            resourceGroupName=${{ inputs.RESOURCE_GROUP_NAME }}
+            foundryUsername=${{ secrets.FOUNDRY_USERNAME }}
+            foundryPassword=${{ secrets.FOUNDRY_PASSWORD }}
+            foundryAdminKey=${{ secrets.FOUNDRY_ADMIN_KEY }}
+            storageConfiguration=${{ inputs.STORAGE_CONFIGURATION }}
+            containerConfiguration=${{ inputs.CONTAINER_CONFIGURATION }}

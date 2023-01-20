@@ -1,0 +1,56 @@
+name: deploy-foundryvtt
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  LOCATION: AustraliaEast
+  STORAGE_CONFIGURATION: Premium_100GB
+  # The type of Azure service to deploy the resources to.
+  # ACI = Azure Container Instance
+  # AAS = Azure App Service (Web App)
+  TYPE: 'AAS'
+
+  # Only required if TYPE is ACI
+  CONTAINER_CONFIGURATION: Small
+
+  # Only required if TYPE is AAS
+  APPSERVICEPLAN_CONFIGURATION: P1V2
+  DEPLOY_DDBPROXY: true
+
+jobs:
+  deploy-aas:
+    if: env.Type == 'AAS'
+    uses: ./.github/workflows/deploy-aas.yml
+    with:
+      location: ${{ env.LOCATION }}
+      baseResourceName: ${{ secrets.BASE_RESOURCE_NAME }}
+      resourceGroupName: ${{ secrets.RESOURCE_GROUP_NAME }}
+      storageConfiguration: ${{ env.STORAGE_CONFIGURATION }}
+      appServicePlanConfiguration: ${{ env.APPSERVICEPLAN_CONFIGURATION }}
+      deployDdbProxy: ${{ env.DEPLOY_DDBPROXY }}
+    secrets:
+      foundryUsername: ${{ secrets.FOUNDRY_USERNAME }}
+      foundryPassword: ${{ secrets.FOUNDRY_PASSWORD }}
+      foundryAdminKey: ${{ secrets.FOUNDRY_PASSWORD }}
+
+  deploy-aci:
+    if: env.Type == 'ACI'
+    uses: ./.github/workflows/deploy-aci.yml
+    with:
+      location: ${{ env.LOCATION }}
+      baseResourceName: ${{ secrets.BASE_RESOURCE_NAME }}
+      resourceGroupName: ${{ secrets.RESOURCE_GROUP_NAME }}
+      storageConfiguration: ${{ env.STORAGE_CONFIGURATION }}
+      containerConfiguration: ${{ env.$CONTAINER_CONFIGURATION }}
+    secrets:
+      foundryUsername: ${{ secrets.FOUNDRY_USERNAME }}
+      foundryPassword: ${{ secrets.FOUNDRY_PASSWORD }}
+      foundryAdminKey: ${{ secrets.FOUNDRY_PASSWORD }}
