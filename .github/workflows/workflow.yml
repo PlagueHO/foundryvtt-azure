@@ -30,7 +30,7 @@ jobs:
     if: env.Type == 'AAS'
     uses: ./.github/workflows/deploy-aas.yml
     with:
-      LOCATION: ${{ env.LOCATION }}
+      LOCATION: ${{ vars.LOCATION }}
       BASE_RESOURCE_NAME: ${{ env.BASE_RESOURCE_NAME }}
       RESOURCE_GROUP_NAME: ${{ env.RESOURCE_GROUP_NAME }}
       STORAGE_CONFIGURATION: ${{ env.STORAGE_CONFIGURATION }}
@@ -48,7 +48,7 @@ jobs:
     if: env.Type == 'ACI'
     uses: ./.github/workflows/deploy-aci.yml
     with:
-      location: ${{ env.LOCATION }}
+      location: ${{ vars.LOCATION }}
       BASE_RESOURCE_NAME: ${{ env.BASE_RESOURCE_NAME }}
       RESOURCE_GROUP_NAME: ${{ env.RESOURCE_GROUP_NAME }}
       STORAGE_CONFIGURATION: ${{ env.STORAGE_CONFIGURATION }}
