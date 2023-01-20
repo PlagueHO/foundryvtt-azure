@@ -27,15 +27,15 @@ env:
 
 jobs:
   deploy-aas:
-    if: env.Type == 'AAS'
+    if: vars.Type == 'AAS'
     uses: ./.github/workflows/deploy-aas.yml
     with:
       LOCATION: ${{ vars.LOCATION }}
-      BASE_RESOURCE_NAME: ${{ env.BASE_RESOURCE_NAME }}
-      RESOURCE_GROUP_NAME: ${{ env.RESOURCE_GROUP_NAME }}
-      STORAGE_CONFIGURATION: ${{ env.STORAGE_CONFIGURATION }}
-      APPSERVICEPLAN_CONFIGURATION: ${{ env.APPSERVICEPLAN_CONFIGURATION }}
-      DEPLOY_DDBPROXY: ${{ env.DEPLOY_DDBPROXY }}
+      BASE_RESOURCE_NAME: ${{ vars.BASE_RESOURCE_NAME }}
+      RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+      STORAGE_CONFIGURATION: ${{ vars.STORAGE_CONFIGURATION }}
+      APPSERVICEPLAN_CONFIGURATION: ${{ vars.APPSERVICEPLAN_CONFIGURATION }}
+      DEPLOY_DDBPROXY: ${{ vars.DEPLOY_DDBPROXY }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -45,14 +45,14 @@ jobs:
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
   deploy-aci:
-    if: env.Type == 'ACI'
+    if: vars.Type == 'ACI'
     uses: ./.github/workflows/deploy-aci.yml
     with:
       location: ${{ vars.LOCATION }}
-      BASE_RESOURCE_NAME: ${{ env.BASE_RESOURCE_NAME }}
-      RESOURCE_GROUP_NAME: ${{ env.RESOURCE_GROUP_NAME }}
-      STORAGE_CONFIGURATION: ${{ env.STORAGE_CONFIGURATION }}
-      CONTAINER_CONFIGURATION: ${{ env.$CONTAINER_CONFIGURATION }}
+      BASE_RESOURCE_NAME: ${{ vars.BASE_RESOURCE_NAME }}
+      RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+      STORAGE_CONFIGURATION: ${{ vars.STORAGE_CONFIGURATION }}
+      CONTAINER_CONFIGURATION: ${{ vars.$CONTAINER_CONFIGURATION }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
