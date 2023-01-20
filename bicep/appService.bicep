@@ -38,7 +38,7 @@ param storageConfiguration string = 'Premium_100GB'
   'P2V3'
   'P3V3'
 ])
-param appServicePlanConfiguration string = 'F1'
+param appServicePlanConfiguration string = 'P1V2'
 
 @description('Deploy a D&D Beyond proxy into the app service plan.')
 param deployDdbProxy bool = false
