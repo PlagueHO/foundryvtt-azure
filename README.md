@@ -10,7 +10,7 @@ This repository will deploy a Foundry Virtual Table top using various different 
 
 > IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [Configuring Workload Identity Federation for GitHub Actions workflow](#configuring-workload-identity-federation-for-github-actions-workflow) for more information.
 
-You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/DsrDemoOrg/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
+You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
 
 The available architectures are (prefixed by the `TYPE` value to provide in the workflow):
 
@@ -106,7 +106,7 @@ Customize and run this code in Azure Cloud Shell to create the credential for th
 ```powershell
 $credentialname = '<The name to use for the credential & app>' # e.g., github-dsrfoundryvtt-workflow
 $application = New-AzADApplication -DisplayName $credentialname
-$policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main" # e.g., repo:DsrDemoOrg/foundryvtt-azure:ref:refs/heads/main
+$policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main" # e.g., repo:PlagueHO/foundryvtt-azure:ref:refs/heads/main
 $subscriptionId = '<your Azure subscription>'
 
 New-AzADAppFederatedCredential `
