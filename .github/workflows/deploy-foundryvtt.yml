@@ -16,13 +16,13 @@ env:
   # The type of Azure service to deploy the resources to.
   # ACI = Azure Container Instance
   # AAS = Azure App Service (Web App)
-  TYPE: 'ACI'
+  TYPE: 'AAS'
 
   # Only required if TYPE is ACI
   CONTAINER_CONFIGURATION: Large
 
   # Only required if TYPE is AAS
-  APPSERVICEPLAN_CONFIGURATION: P2V3
+  APPSERVICEPLAN_CONFIGURATION: P1V2
   DEPLOY_DDBPROXY: true
 
 jobs:
