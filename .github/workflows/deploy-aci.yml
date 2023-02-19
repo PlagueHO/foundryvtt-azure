@@ -60,6 +60,7 @@ jobs:
           parameters: >
             baseResourceName=${{ inputs.BASE_RESOURCE_NAME }}
             resourceGroupName=${{ inputs.RESOURCE_GROUP_NAME }}
+            location=${{ inputs.LOCATION }}
             foundryUsername=${{ secrets.FOUNDRY_USERNAME }}
             foundryPassword=${{ secrets.FOUNDRY_PASSWORD }}
             foundryAdminKey=${{ secrets.FOUNDRY_ADMIN_KEY }}
