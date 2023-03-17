@@ -16,7 +16,7 @@ env:
   # The type of Azure service to deploy the resources to.
   # ACI = Azure Container Instance
   # AAS = Azure App Service (Web App)
-  TYPE: 'AAS'
+  TYPE: 'ACI'
 
   # Only required if TYPE is ACI
   CONTAINER_CONFIGURATION: Large
@@ -32,9 +32,6 @@ jobs:
     env:
       BASE_RESOURCE_NAME: ${{ secrets.BASE_RESOURCE_NAME }}
       RESOURCE_GROUP_NAME: ${{ secrets.RESOURCE_GROUP_NAME }}
-      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
-      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
     steps:
       - name: Checkout Repository
