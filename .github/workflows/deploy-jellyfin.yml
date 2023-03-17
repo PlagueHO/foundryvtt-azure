@@ -19,7 +19,7 @@ env:
   TYPE: 'ACI'
 
   # Only required if TYPE is ACI
-  CONTAINER_CONFIGURATION: Large
+  CONTAINER_CONFIGURATION: Small
 
   # Only required if TYPE is AAS
   APPSERVICEPLAN_CONFIGURATION: P1V2
