@@ -45,27 +45,13 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
   properties: {
     containers: [
       {
-        name: 'foundryvtt'
+        name: 'jellyfin'
         properties: {
-          image: 'felddy/foundryvtt:release'
+          image: 'jellyfin/jellyfin'
           ports: [
             {
               protocol: 'TCP'
-              port: 30000
-            }
-          ]
-          environmentVariables: [
-            {
-              name: 'FOUNDRY_USERNAME'
-              secureValue: foundryUsername
-            }
-            {
-              name: 'FOUNDRY_PASSWORD'
-              secureValue: foundryPassword
-            }
-            {
-              name: 'FOUNDRY_ADMIN_KEY'
-              secureValue: foundryAdminKey
+              port: 8096
             }
           ]
           resources: {
@@ -76,7 +62,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
           }
           volumeMounts: [
             {
-              name: 'foundrydata'
+              name: 'jellydata'
               mountPath: '/data'
             }
           ]
@@ -88,7 +74,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
       ports: [
         {
           protocol: 'TCP'
-          port: 30000
+          port: 8096
         }
       ]
       type: 'Public'
@@ -109,4 +95,4 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
   }
 }
 
-output url string = 'http://${containerGroup.properties.ipAddress.fqdn}:30000'
+output url string = 'http://${containerGroup.properties.ipAddress.fqdn}:8096'
