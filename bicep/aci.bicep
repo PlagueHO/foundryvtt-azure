@@ -1,6 +1,6 @@
 targetScope = 'subscription'
 
-param location string = 'AustraliaEast'
+param location string = 'EuropeNorth'
 param resourceGroupName string
 
 @description('The base name that will prefixed to all Azure resources deployed to ensure they are unique.')
