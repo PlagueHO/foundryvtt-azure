@@ -121,7 +121,7 @@ New-AzRoleAssignment `
   -ApplicationId $application.AppId `
   -RoleDefinitionName Contributor `
   -Scope "/subscriptions/$subscriptionId" `
-  -Description "The deployment workflow for the foundry VTT."
+  -Description "The GitHub Actions deployment workflow for Foundry VTT."
 ```
 
 To learn how to configure Workload Identity Federation with GitHub Actions, see [this Microsoft Learn Module](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
