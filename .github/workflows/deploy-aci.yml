@@ -54,7 +54,7 @@ jobs:
           failOnStdErr: false
           deploymentName: ${{ github.run_number }}
           resourceGroupName: ${{ inputs.RESOURCE_GROUP_NAME }}
-          template: ./bicep/appService.bicep
+          template: ./bicep/aci.bicep
           region: ${{ inputs.LOCATION }}
           scope: subscription
           parameters: >

@@ -86,7 +86,6 @@ The following GitHub Secrets need to be defined to ensure that resource names fo
 - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
 - `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
 - `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-- `AZURE_CREDENTIALS`: Created as per [this document](https://github.com/marketplace/actions/azure-cli-action#configure-azure-credentials-as-github-secret).
 - `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
 - `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `FOUNDRY_USERNAME`: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release` container image.
@@ -121,7 +120,7 @@ New-AzRoleAssignment `
   -ApplicationId $application.AppId `
   -RoleDefinitionName Contributor `
   -Scope "/subscriptions/$subscriptionId" `
-  -Description "The deployment workflow for the foundry VTT."
+  -Description "The GitHub Actions deployment workflow for Foundry VTT."
 ```
 
 To learn how to configure Workload Identity Federation with GitHub Actions, see [this Microsoft Learn Module](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
