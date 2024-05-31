@@ -35,7 +35,7 @@ The following environment variables should be configured in the repository to de
 - `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
 - `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
 - `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
-- `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P1V3`, `P2V3`, `P3V3`.
+- `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P0V3`, `P1V3`, `P2V3`, `P3V3`.
 
 Your variables should look similar to this:
 ![Example of GitHub Variables](/images/github-variables-example.png)
