@@ -52,7 +52,7 @@ jobs:
         uses: azure/arm-deploy@v1
         with:
           failOnStdErr: false
-          deploymentName: ${{ github.run_number }}
+          deploymentName: 'foundrvtt-${{ github.action_ref }}-${{ github.run_number }}'
           resourceGroupName: ${{ inputs.RESOURCE_GROUP_NAME }}
           template: ./bicep/aci.bicep
           region: ${{ inputs.LOCATION }}
