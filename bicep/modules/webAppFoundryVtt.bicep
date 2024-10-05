@@ -14,7 +14,7 @@ param foundryAdminKey string
 
 var linuxFxVersion = 'DOCKER|felddy/foundryvtt:release'
 
-resource webApp 'Microsoft.Web/sites@2021-01-15' = {
+resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
   location: location
   kind: 'app,linux,container'
@@ -24,6 +24,7 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
     siteConfig: {
       numberOfWorkers: 1
       linuxFxVersion: linuxFxVersion
+      alwaysOn: true
       appSettings: [
         {
           name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
@@ -72,7 +73,7 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
     }
   }
 
-  resource config 'config@2021-01-15' = {
+  resource config 'config@2023-12-01' = {
     name: 'web'
     properties: {
       linuxFxVersion: linuxFxVersion

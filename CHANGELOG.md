@@ -3,6 +3,15 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.5.1] - 2024-10-06
+
+### Changed
+
+- Updated Bicep resource versions to latest for Azure App Service and
+  Storage.
+- Set `alwaysOn` to `true` for the Foundry Web App.
+
 ## [0.5.0] - 2024-06-01
 
 ### Added

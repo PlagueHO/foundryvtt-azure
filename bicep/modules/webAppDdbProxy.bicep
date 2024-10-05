@@ -4,7 +4,7 @@ param webAppName string
 
 var linuxFxVersion = 'DOCKER|ghcr.io/mrprimate/ddb-proxy:latest'
 
-resource webApp 'Microsoft.Web/sites@2021-01-15' = {
+resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
   location: location
   kind: 'app,linux,container'
@@ -31,7 +31,7 @@ resource webApp 'Microsoft.Web/sites@2021-01-15' = {
     }
   }
 
-  resource config 'config@2021-01-15' = {
+  resource config 'config@2023-12-01' = {
     name: 'web'
     properties: {
       linuxFxVersion: linuxFxVersion
