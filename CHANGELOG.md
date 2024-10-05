@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Bicep resource versions to latest for Azure App Service and
   Storage.
 - Set `alwaysOn` to `true` for the Foundry Web App.
+- Update Foundry Web App Deployment to get the storage account key via
+  `2023-05-01` API version.
 
 ## [0.5.0] - 2024-06-01
 

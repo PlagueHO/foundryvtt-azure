@@ -83,7 +83,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           accountName: storageAccountName
           shareName: 'foundryvttdata'
           mountPath: '/data'
-          accessKey: listkeys(resourceId('Microsoft.Storage/storageAccounts', storageAccountName), '2021-04-01').keys[0].value
+          accessKey: listkeys(resourceId('Microsoft.Storage/storageAccounts', storageAccountName), '2023-05-01').keys[0].value
         }
       }
       httpLoggingEnabled: true
