@@ -77,6 +77,7 @@ module storageAccount './modules/storageAccount.bicep' = {
     storageAccountName: baseResourceName
     storageConfiguration: storageConfiguration
     storageSubnetId: vnet.outputs.storageSubnetId
+    dnsZoneId: dnsPrivateZone.outputs.dnsZoneId
   }
 }
 

@@ -18,3 +18,5 @@ resource dnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@
     registrationEnabled: false
   }
 }
+
+output dnsZoneId string = filePrivateDNSZone.id

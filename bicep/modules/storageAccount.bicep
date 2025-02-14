@@ -10,6 +10,7 @@ param storageConfiguration string = 'Premium_100GB'
 
 // New parameter for subnet id from the VNET module
 param storageSubnetId string
+param dnsZoneId string
 
 var storageConfigurationMap = {
   Premium_100GB: {
@@ -69,6 +70,22 @@ resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' 
           groupIds: [
             'file'
           ]
+        }
+      }
+    ]
+  }
+}
+
+// Register the Storage Account private endpoint in the Private DNS Zone
+resource dnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-11-01' = {
+  name: 'default'
+  parent: storagePrivateEndpoint
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'config'
+        properties: {
+          privateDnsZoneId: dnsZoneId
         }
       }
     ]
