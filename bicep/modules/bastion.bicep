@@ -3,7 +3,7 @@ param bastionName string = 'defaultBastion'
 param bastionSubnetId string
 
 resource bastionPublicIP 'Microsoft.Network/publicIPAddresses@2020-05-01' = {
-  name: '${bastionName}-bastion-pip'
+  name: '${bastionName}-pip'
   location: location
   sku: {
     name: 'Basic'

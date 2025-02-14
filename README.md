@@ -101,6 +101,12 @@ These values should be kept secret and care taken to ensure they are not shared 
 Your secrets should look like this:
 ![Example of GitHub Secrets](/images/github-secrets-example.png)
 
+### Azure Bastion
+
+Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` environment variable to `true`.
+
+- `DEPLOY_BASTION`: Setting this variable to true will deploy an Azure Bastion into the same resource group.
+
 ## Configuring Workload Identity Federation for GitHub Actions workflow
 
 Customize and run this code in Azure Cloud Shell to create the credential for the GitHub workflow to use to deploy to Azure.

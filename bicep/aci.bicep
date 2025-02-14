@@ -41,7 +41,6 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
-// Deploy VNET module to obtain subnet outputs
 module vnet './modules/vnet.bicep' = {
   name: 'vnet'
   scope: rg
@@ -51,7 +50,6 @@ module vnet './modules/vnet.bicep' = {
   }
 }
 
-// Add DNS Private Zone module for ACI
 module dnsPrivateZone './modules/dnsPrivateZone.bicep' = {
   name: 'dnsPrivateZone'
   scope: rg
