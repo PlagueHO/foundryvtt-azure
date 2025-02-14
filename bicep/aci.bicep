@@ -54,6 +54,7 @@ module dnsPrivateZone './modules/dnsPrivateZone.bicep' = {
   name: 'dnsPrivateZone'
   scope: rg
   params: {
+    location: 'global'
     vnetId: vnet.outputs.vnetId
   }
 }
