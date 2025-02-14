@@ -6,7 +6,7 @@ resource bastionPublicIP 'Microsoft.Network/publicIPAddresses@2020-05-01' = {
   name: '${bastionName}-pip'
   location: location
   sku: {
-    name: 'Standard' // changed from 'Basic'
+    name: 'Standard'
   }
   properties: {
     publicIPAllocationMethod: 'Static'
@@ -18,7 +18,7 @@ resource bastionHost 'Microsoft.Network/bastionHosts@2024-05-01' = {
   name: bastionName
   location: location
   sku: {
-    name: 'Basic'
+    name: 'Standard'
   }
   properties: {
     ipConfigurations: [

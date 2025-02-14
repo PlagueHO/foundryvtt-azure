@@ -56,6 +56,7 @@ module dnsPrivateZone './modules/dnsPrivateZone.bicep' = {
   params: {
     location: 'global'
     vnetId: vnet.outputs.vnetId
+    vnetLinkName: '${baseResourceName}-vnetLink'
   }
 }
 
