@@ -33,6 +33,9 @@ param storageConfiguration string = 'Premium_100GB'
 ])
 param containerConfiguration string = 'Small'
 
+@description('Deploy a Bastion host into the VNET.')
+param deployBastion bool = false
+
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName
   location: location
@@ -71,6 +74,16 @@ module containerGroup './modules/containerGroup.bicep' = {
     foundryPassword: foundryPassword
     foundryAdminKey: foundryAdminKey
     containerConfiguration: containerConfiguration
+  }
+}
+
+module bastion './modules/bastion.bicep' = if (deployBastion) {
+  name: 'bastion'
+  scope: rg
+  params: {
+    location: location
+    bastionName: '${baseResourceName}-bastion'
+    bastionSubnetId: vnet.outputs.bastionSubnetId
   }
 }
 

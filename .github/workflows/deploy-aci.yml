@@ -18,6 +18,10 @@ on:
       CONTAINER_CONFIGURATION:
         required: true
         type: string
+      DEPLOY_BASTION:
+        required: false
+        type: string
+        default: 'false'
     secrets:
       AZURE_TENANT_ID:
         required: true
@@ -66,3 +70,4 @@ jobs:
             foundryAdminKey=${{ secrets.FOUNDRY_ADMIN_KEY }}
             storageConfiguration=${{ inputs.STORAGE_CONFIGURATION }}
             containerConfiguration=${{ inputs.CONTAINER_CONFIGURATION }}
+            deployBastion=${{ inputs.DEPLOY_BASTION }}

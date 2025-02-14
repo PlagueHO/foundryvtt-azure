@@ -7,6 +7,8 @@ param appServiceSubnetName string = 'webAppIntegration'
 param appServiceSubnetPrefix string = '10.0.2.0/24'
 param containerGroupSubnetName string = 'containerGroupSubnet'
 param containerGroupSubnetPrefix string = '10.0.3.0/24'
+param bastionSubnetName string = 'AzureBastionSubnet'
+param bastionSubnetPrefix string = '10.0.4.0/27'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
   name: vnetName
@@ -39,11 +41,16 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
           ]
         }
       }
-      // New subnet for Container Group deployment
       {
         name: containerGroupSubnetName
         properties: {
           addressPrefix: containerGroupSubnetPrefix
+        }
+      }
+      {
+        name: bastionSubnetName
+        properties: {
+          addressPrefix: bastionSubnetPrefix
         }
       }
     ]
@@ -54,3 +61,4 @@ output vnetId string = vnet.id
 output storageSubnetId string = vnet.properties.subnets[0].id
 output appServiceSubnetId string = vnet.properties.subnets[1].id
 output containerGroupSubnetId string = vnet.properties.subnets[2].id
+output bastionSubnetId string = vnet.properties.subnets[3].id

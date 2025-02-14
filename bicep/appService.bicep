@@ -44,6 +44,9 @@ param appServicePlanConfiguration string = 'P0V3'
 @description('Deploy a D&D Beyond proxy into the app service plan.')
 param deployDdbProxy bool = false
 
+@description('Deploy a Bastion host into the VNET.')
+param deployBastion bool = false
+
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: resourceGroupName
   location: location
@@ -66,7 +69,6 @@ module storageAccount './modules/storageAccount.bicep' = {
     location: location
     storageAccountName: baseResourceName
     storageConfiguration: storageConfiguration
-    // Pass storage subnet ID from VNET module
     storageSubnetId: vnet.outputs.storageSubnetId
   }
 }
@@ -95,7 +97,6 @@ module webAppFoundryVtt './modules/webAppFoundryVtt.bicep' = {
     foundryUsername: foundryUsername
     foundryPassword: foundryPassword
     foundryAdminKey: foundryAdminKey
-    // Pass App Service subnet ID from VNET module
     appServiceSubnetId: vnet.outputs.appServiceSubnetId
   }
 }
@@ -107,8 +108,18 @@ module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
     location: location
     appServicePlanId: appServicePlan.outputs.appServicePlanId
     webAppName: '${baseResourceName}ddbproxy'
-    // Pass App Service subnet ID from VNET module
     appServiceSubnetId: vnet.outputs.appServiceSubnetId
+  }
+}
+
+// New Bastion module; deployed only if deployBastion is true
+module bastion './modules/bastion.bicep' = if (deployBastion) {
+  name: 'bastion'
+  scope: rg
+  params: {
+    location: location
+    bastionName: '${baseResourceName}-bastion'
+    bastionSubnetId: vnet.outputs.bastionSubnetId
   }
 }
 
