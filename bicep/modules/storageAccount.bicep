@@ -8,6 +8,9 @@ param storageShareName string = 'foundryvttdata'
 ])
 param storageConfiguration string = 'Premium_100GB'
 
+// New parameter for subnet id from the VNET module
+param storageSubnetId string
+
 var storageConfigurationMap = {
   Premium_100GB: {
     kind: 'FileStorage'
@@ -34,6 +37,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     accessTier: 'Hot'
     allowSharedKeyAccess: true
     largeFileSharesState: storageConfigurationMap[storageConfiguration].largeFileSharesState
+    publicNetworkAccess: 'Disabled'
   }
 
   resource symbolicname 'fileServices@2023-05-01' = {
@@ -46,5 +50,27 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
         shareQuota: storageConfigurationMap[storageConfiguration].shareQuota
       }
     }
+  }
+}
+
+// Private Endpoint for Storage Account
+resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' = {
+  name: '${storageAccountName}-pe'
+  location: location
+  properties: {
+    subnet: {
+      id: storageSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'storageConnection'
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'file'
+          ]
+        }
+      }
+    ]
   }
 }

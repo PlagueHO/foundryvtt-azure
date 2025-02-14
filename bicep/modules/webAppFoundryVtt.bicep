@@ -12,6 +12,9 @@ param foundryPassword string
 @secure()
 param foundryAdminKey string
 
+// New parameter for App Service subnet ID from the VNET module
+param appServiceSubnetId string
+
 var linuxFxVersion = 'DOCKER|felddy/foundryvtt:release'
 
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
@@ -21,6 +24,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlanId
     httpsOnly: true
+    virtualNetworkSubnetId: appServiceSubnetId
     siteConfig: {
       numberOfWorkers: 1
       linuxFxVersion: linuxFxVersion

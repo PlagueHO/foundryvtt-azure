@@ -2,6 +2,9 @@ param location string
 param appServicePlanId string
 param webAppName string
 
+// New parameter for App Service subnet ID from the VNET module
+param appServiceSubnetId string
+
 var linuxFxVersion = 'DOCKER|ghcr.io/mrprimate/ddb-proxy:latest'
 
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
@@ -11,6 +14,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlanId
     httpsOnly: true
+    virtualNetworkSubnetId: appServiceSubnetId
     siteConfig: {
       numberOfWorkers: 1
       linuxFxVersion: linuxFxVersion

@@ -49,6 +49,16 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
+// Deploy VNET module to obtain subnet outputs
+module vnet './modules/vnet.bicep' = {
+  name: 'vnet'
+  scope: rg
+  params: {
+    location: location
+    vnetName: '${baseResourceName}-vnet'
+  }
+}
+
 module storageAccount './modules/storageAccount.bicep' = {
   name: 'storageAccount'
   scope: rg
@@ -56,6 +66,8 @@ module storageAccount './modules/storageAccount.bicep' = {
     location: location
     storageAccountName: baseResourceName
     storageConfiguration: storageConfiguration
+    // Pass storage subnet ID from VNET module
+    storageSubnetId: vnet.outputs.storageSubnetId
   }
 }
 
@@ -83,6 +95,8 @@ module webAppFoundryVtt './modules/webAppFoundryVtt.bicep' = {
     foundryUsername: foundryUsername
     foundryPassword: foundryPassword
     foundryAdminKey: foundryAdminKey
+    // Pass App Service subnet ID from VNET module
+    appServiceSubnetId: vnet.outputs.appServiceSubnetId
   }
 }
 
@@ -93,6 +107,8 @@ module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
     location: location
     appServicePlanId: appServicePlan.outputs.appServicePlanId
     webAppName: '${baseResourceName}ddbproxy'
+    // Pass App Service subnet ID from VNET module
+    appServiceSubnetId: vnet.outputs.appServiceSubnetId
   }
 }
 

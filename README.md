@@ -26,6 +26,8 @@ The available architectures are (prefixed by the `TYPE` value to provide in the 
 
 This method will deploy an [Azure App Service Web App running Linux Containers](https://learn.microsoft.com/azure/app-service/configure-custom-container) and attach an Azure Storage account with an SMB share for persistent storage.
 
+> IMPORTANT: It is best practice to put the Storage Account in a VNET and disable public access. A VNET will be created and the Storage Account and App Service will be put into it. This will prevent public access to the Storage Account. The App Service will still be publically accessible.
+
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
 The following environment variables should be configured in the repository to define the region to deploy to and the storage and container configuration:
@@ -67,6 +69,8 @@ game.settings.set("ddb-importer", "api-endpoint", "https://<BASE_RESOURCE_NAME>d
 ```
 
 ## Azure Container Instances with Azure Files
+
+> IMPORTANT: It is best practice to put the Storage Account in a VNET and disable public access. However, this is not currently supported by this deployment method yet. I plan to implement this in future.
 
 This method will deploy an [Azure Container Instance](https://learn.microsoft.com/azure/container-instances/container-instances-overview) and attach an Azure Storage account with an SMB share for persistent storage.
 

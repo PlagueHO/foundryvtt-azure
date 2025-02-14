@@ -38,6 +38,16 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
+// Deploy VNET module to obtain subnet outputs
+module vnet './modules/vnet.bicep' = {
+  name: 'vnet'
+  scope: rg
+  params: {
+    location: location
+    vnetName: '${baseResourceName}-vnet'
+  }
+}
+
 module storageAccount './modules/storageAccount.bicep' = {
   name: 'storageAccount'
   scope: rg
@@ -45,15 +55,13 @@ module storageAccount './modules/storageAccount.bicep' = {
     location: location
     storageAccountName: baseResourceName
     storageConfiguration: storageConfiguration
+    storageSubnetId: vnet.outputs.storageSubnetId
   }
 }
 
 module containerGroup './modules/containerGroup.bicep' = {
   name: 'containerGroup'
   scope: rg
-  dependsOn: [
-    storageAccount
-  ]
   params: {
     location: location
     storageAccountName: baseResourceName
