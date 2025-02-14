@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Updated App Service Bicep deployment to remove uneccessary depends on.
+- Added Healthcheck to the Foundry Web App deployment for DDB Proxy.
 
 ## [0.5.1] - 2024-10-06
 

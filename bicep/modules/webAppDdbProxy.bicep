@@ -28,6 +28,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: 'https://ghcr.io'
         }
       ]
+      healthCheckPath: '/ping' // Added health check path
     }
   }
 
