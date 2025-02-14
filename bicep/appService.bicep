@@ -62,6 +62,16 @@ module vnet './modules/vnet.bicep' = {
   }
 }
 
+// Add DNS Private Zone module
+module dnsPrivateZone './modules/dnsPrivateZone.bicep' = {
+  name: 'dnsPrivateZone'
+  scope: rg
+  params: {
+    location: location
+    vnetId: vnet.outputs.vnetId
+  }
+}
+
 module storageAccount './modules/storageAccount.bicep' = {
   name: 'storageAccount'
   scope: rg

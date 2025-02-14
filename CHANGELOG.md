@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Put App Service and Storage Account into VNET to improve security.
 - Added support for deploying Bastion into VNET for access to Storage
   Account and diagnostics.
+- Added private zone to VNET for DNS resolution of the Storage Account.
 
 ## [0.5.2] - 2025-02-15
 
