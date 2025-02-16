@@ -134,4 +134,4 @@ module bastion './modules/bastion.bicep' = if (deployBastion) {
 }
 
 output url string = webAppFoundryVtt.outputs.url
-output ddbproxyurl string = webAppDdbProxy.outputs.url
+output ddbproxyurl string = deployDdbProxy ? webAppDdbProxy.outputs.url : ''
