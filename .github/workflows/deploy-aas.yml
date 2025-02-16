@@ -19,8 +19,9 @@ on:
         required: true
         type: string
       DEPLOY_DDBPROXY:
-        required: true
+        required: false
         type: string
+        default: 'false'
       DEPLOY_BASTION:
         required: false
         type: string
