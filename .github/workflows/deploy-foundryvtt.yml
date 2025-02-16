@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    #- cron: '0 14 * * *' # 2am NZT (UTC+12)
+    - cron: '0 14 * * *' # 2am NZT (UTC+12)
     
 permissions:
   id-token: write
