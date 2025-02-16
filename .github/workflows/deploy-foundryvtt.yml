@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   deploy-aas:
-    if: vars.Type == 'AAS'
+    if: ${{ vars.Type == 'AAS' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'schedule' && vars.SCHEDULED_DEPLOYMENT_ENABLED == 'true' )) }}
     uses: ./.github/workflows/deploy-aas.yml
     with:
       LOCATION: ${{ vars.LOCATION }}
@@ -33,7 +33,7 @@ jobs:
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
   deploy-aci:
-    if: vars.Type == 'ACI'
+    if: ${{ vars.Type == 'ACI' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'schedule' &&  vars.SCHEDULED_DEPLOYMENT_ENABLED == 'true' )) }}
     uses: ./.github/workflows/deploy-aci.yml
     with:
       location: ${{ vars.LOCATION }}
