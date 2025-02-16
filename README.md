@@ -10,6 +10,8 @@ This repository will deploy a Foundry Virtual Table top using various different 
 
 > IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [Configuring Workload Identity Federation for GitHub Actions workflow](#configuring-workload-identity-federation-for-github-actions-workflow) for more information.
 
+You can choose how to deploy by setting the `SCHEDULED_DEPLOYMENT_ENABLED` repository variable. If set to `true`, GitHub Actions will automatically deploy on a schedule (default: daily at 2am NZT, UTC+12). Otherwise, it will deploy only mnaually or on a push.
+
 You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
 
 The available architectures are (prefixed by the `TYPE` value to provide in the workflow):
