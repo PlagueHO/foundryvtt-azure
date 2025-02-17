@@ -105,7 +105,7 @@ Your secrets should look like this:
 
 ### Azure Bastion
 
-Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` repository  variable to `true`.
+Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` repository variable to `true`.
 
 - `DEPLOY_BASTION`: Setting this variable to true will deploy an Azure Bastion into the same resource group.
 
