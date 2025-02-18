@@ -10,7 +10,9 @@ This repository will deploy a Foundry Virtual Table top using various different 
 
 > IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [Configuring Workload Identity Federation for GitHub Actions workflow](#configuring-workload-identity-federation-for-github-actions-workflow) for more information.
 
-You can choose which Azure architecture to use by setting the `TYPE` environment variable in the [deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
+You can choose how to deploy by setting the `SCHEDULED_DEPLOYMENT_ENABLED` repository variable. If set to `true`, GitHub Actions will automatically deploy on a schedule (default: daily at 2am NZT, UTC+12). Otherwise, it will deploy only mnaually or on a push.
+
+You can choose which Azure architecture to use by setting the `TYPE` repository variable in the [deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
 
 The available architectures are (prefixed by the `TYPE` value to provide in the workflow):
 
@@ -30,9 +32,9 @@ This method will deploy an [Azure App Service Web App running Linux Containers](
 
 It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
 
-The following environment variables should be configured in the repository to define the region to deploy to and the storage and container configuration:
+The following repository variables should be configured to define the region to deploy to and the storage and container configuration:
 
-- `TYPE`: Should be set to `ASS` to deploy the Azure App Service for Linux Containers and Azure Files architecture.
+- `TYPE`: Should be set to `AAS` to deploy the Azure App Service for Linux Containers and Azure Files architecture.
 - `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
 - `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
 - `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
@@ -103,7 +105,7 @@ Your secrets should look like this:
 
 ### Azure Bastion
 
-Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` environment variable to `true`.
+Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` repository variable to `true`.
 
 - `DEPLOY_BASTION`: Setting this variable to true will deploy an Azure Bastion into the same resource group.
 
