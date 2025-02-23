@@ -53,6 +53,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
 
       - name: Deploy to Azure Container Instance
+        id: deployment
         uses: azure/bicep-deploy@v2
         with:
           type: deployment
@@ -74,3 +75,7 @@ jobs:
               "containerConfiguration": "${{ inputs.CONTAINER_CONFIGURATION }}",
               "deployBastion": "${{ inputs.DEPLOY_BASTION }}"
             }
+
+      - name: Display Deployment Outputs
+        run: |
+          echo "url: ${{ steps.deployment.outputs.url }}"

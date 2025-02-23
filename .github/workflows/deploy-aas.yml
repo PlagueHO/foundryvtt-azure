@@ -57,6 +57,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
 
       - name: Deploy to Azure App Service
+        id: deployment
         uses: azure/bicep-deploy@v2
         with:
           type: deployment
@@ -80,3 +81,8 @@ jobs:
               "deployDdbProxy": ${{ inputs.DEPLOY_DDBPROXY }},
               "deployBastion": ${{ inputs.DEPLOY_BASTION }}
             }
+
+      - name: Display Deployment Outputs
+        run: |
+          echo "url: ${{ steps.deployment.outputs.url }}"
+          echo "ddbproxyurl: ${{ steps.deployment.outputs.ddbproxyurl }}"
