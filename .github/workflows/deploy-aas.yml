@@ -57,14 +57,17 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
 
       - name: Deploy to Azure App Service
-        uses: azure/arm-deploy@v1
+        uses: azure/bicep-deploy@v2
         with:
           failOnStdErr: false
-          deploymentName: 'foundrvtt-${{ github.action_ref }}-${{ github.run_number }}'
-          resourceGroupName: ${{ inputs.RESOURCE_GROUP_NAME }}
-          template: ./bicep/appService.bicep
-          region: ${{ inputs.LOCATION }}
+          type: deployment
+          operation: create
+          name: foundryvtt-aas-deployment-${{ github.action_ref }}-${{ github.run_number }}
           scope: subscription
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          location: ${{ inputs.LOCATION }}
+          resource-group-name: ${{ inputs.RESOURCE_GROUP_NAME }}
+          template-file: ./bicep/appService.bicep
           parameters: >
             baseResourceName=${{ inputs.BASE_RESOURCE_NAME }}
             resourceGroupName=${{ inputs.RESOURCE_GROUP_NAME }}
