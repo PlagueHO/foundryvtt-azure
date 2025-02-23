@@ -68,13 +68,15 @@ jobs:
           resource-group-name: ${{ inputs.RESOURCE_GROUP_NAME }}
           template-file: ./bicep/appService.bicep
           parameters: >
-            baseResourceName=${{ inputs.BASE_RESOURCE_NAME }}
-            resourceGroupName=${{ inputs.RESOURCE_GROUP_NAME }}
-            location=${{ inputs.LOCATION }}
-            foundryUsername=${{ secrets.FOUNDRY_USERNAME }}
-            foundryPassword=${{ secrets.FOUNDRY_PASSWORD }}
-            foundryAdminKey=${{ secrets.FOUNDRY_ADMIN_KEY }}
-            storageConfiguration=${{ inputs.STORAGE_CONFIGURATION }}
-            appServicePlanConfiguration=${{ inputs.APPSERVICEPLAN_CONFIGURATION }}
-            deployDdbProxy=${{ inputs.DEPLOY_DDBPROXY }}
-            deployBastion=${{ inputs.DEPLOY_BASTION }}
+            {
+              "baseResourceName": "${{ inputs.BASE_RESOURCE_NAME }}",
+              "resourceGroupName": "${{ inputs.RESOURCE_GROUP_NAME }}",
+              "location": "${{ inputs.LOCATION }}",
+              "foundryUsername": "${{ secrets.FOUNDRY_USERNAME }}",
+              "foundryPassword": "${{ secrets.FOUNDRY_PASSWORD }}",
+              "foundryAdminKey": "${{ secrets.FOUNDRY_ADMIN_KEY }}",
+              "storageConfiguration": "${{ inputs.STORAGE_CONFIGURATION }}",
+              "appServicePlanConfiguration": "${{ inputs.APPSERVICEPLAN_CONFIGURATION }}",
+              "deployDdbProxy": "${{ inputs.DEPLOY_DDBPROXY }}",
+              "deployBastion": "${{ inputs.DEPLOY_BASTION }}"
+            }
