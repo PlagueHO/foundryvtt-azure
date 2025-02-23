@@ -122,7 +122,6 @@ module webAppDdbProxy './modules/webAppDdbProxy.bicep' = if (deployDdbProxy) {
   }
 }
 
-// New Bastion module; deployed only if deployBastion is true
 module bastion './modules/bastion.bicep' = if (deployBastion) {
   name: 'bastion'
   scope: rg
