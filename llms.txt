@@ -1,0 +1,41 @@
+# Solution: FoundryVTT Azure Deployment
+
+**Version:** 1.0  
+**Last Updated:** 2024-06-10  
+**Owner:** PlagueHO  
+**GitHub Repository:** https://github.com/PlagueHO/foundryvtt-azure
+
+## 1. Purpose & Scope
+
+This repository provides infrastructure-as-code (IaC) templates and documentation for deploying Foundry Virtual Tabletop (FoundryVTT) on Microsoft Azure. It is intended for developers, system administrators, and hobbyists who wish to automate the deployment and management of FoundryVTT in a cloud environment using Azure resources.
+
+## 2. Folder Structure
+
+```
+/
+├── docs/           # Developer and user documentation
+├── infra/          # Infrastructure-as-code templates and deployment scripts
+│   ├── bicep/      # Bicep templates for Azure resource provisioning
+│   ├── scripts/    # Helper scripts for deployment and management
+│   └── ...         # Other infra-related files
+├── specs/          # Machine-readable specifications (if present)
+├── README.md       # Project overview and getting started guide
+├── llms.txt        # Guidance for LLMs (this file)
+└── ...             # Other project files
+```
+
+- `docs/`: Contains guides, usage instructions, and reference documentation.
+- `infra/`: Contains all infrastructure code and scripts for Azure deployments.
+- `specs/`: (If present) Contains specifications for the solution.
+- `README.md`: Main entry point for understanding the project.
+
+## 3. Important Files
+
+- `README.md`: Overview, prerequisites, and instructions for using the repository.
+- `llms.txt`: This file; provides navigation and content discovery guidance for LLMs.
+- `infra/aci.bicep`: Bicep file for deploying FoundryVTT into an Azure Container Instance.
+- `infra/appService.bicep`: Bicep file for deploying FoundryVTT into an Azure App Service WebApp.
+- `docs/`: Contains additional documentation for setup, usage, and troubleshooting.
+- `specs/`: (If present) Contains machine-readable specifications relevant to the solution.
+
+Refer to the `README.md` for detailed setup and usage instructions. For infrastructure details, see the files in the `infra/` folder.

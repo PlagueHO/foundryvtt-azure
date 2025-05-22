@@ -63,6 +63,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           location: ${{ inputs.LOCATION }}
           resource-group-name: ${{ inputs.RESOURCE_GROUP_NAME }}
+          template-file: ./infra/aci.bicep
           parameters: >
             {
               "baseResourceName": "${{ inputs.BASE_RESOURCE_NAME }}",
