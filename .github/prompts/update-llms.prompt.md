@@ -2,7 +2,7 @@
 mode: 'edit'
 description: 'Update the llms.txt file in the root folder to reflect changes in documentation or specifications'
 ---
-Your task is to update the [llms.txt](/llms.txt) file located in the root of the repository. This file provides high-level guidance to large language models (LLMs) on where to find relevant content for understanding the solution's purpose and specifications.
+Your task is to update the [llms.txt](../../llms.txt) file located in the root of the repository. This file provides high-level guidance to large language models (LLMs) on where to find relevant content for understanding the solution's purpose and specifications.
 
 **Instructions:**
 - Ensure the `llms.txt` file accurately references all folders and files that are important for LLM comprehension, including the `specs/` folder (for machine-readable specifications) and the `docs/` folder (for developer and user documentation).
