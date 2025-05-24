@@ -1,9 +1,8 @@
 name: deploy-production
 
 on:
-  push:
-    branches:
-      - main
+  # This workflow is only triggered manually and on a schedule as it deploys to production.
+  push:  
   workflow_dispatch:
   schedule:
     - cron: '0 14 * * *' # 2am NZT (UTC+12)
