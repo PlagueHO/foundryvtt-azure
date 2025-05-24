@@ -39,8 +39,9 @@ Before you begin, ensure you have:
 
 You can choose which Azure compute service to use for running Foundry VTT by setting the `AZURE_COMPUTE_SERVICE` environment variable before deployment. Supported options:
 
-- **WebApp** (default): Deploys Foundry VTT as a Linux container in Azure App Service. Recommended for most users.
-- **ContainerInstance**: Deploys Foundry VTT in an Azure Container Instance. Useful for lightweight or temporary workloads.
+- **Web App** (default): Deploys Foundry VTT as a Linux container in Azure App Service. This option deploys into a virtual network by default. Recommended for most users.
+- **Container Instance**: Deploys Foundry VTT in an Azure Container Instance. Useful for lightweight or temporary workloads. This option does not support deploying into a virtual network.
+- **Container Apps**: Not currently supported, but may be added in the future.
 
 Set the compute service using:
 
@@ -48,20 +49,21 @@ Set the compute service using:
 azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 ```
 
-### WebApp (Linux Container)
+### Feature Comparison
 
-- Runs Foundry VTT in an Azure App Service (Linux) using the `felddy/foundryvtt:release` Docker image.
-- Persistent data is stored in Azure Files.
-- Supports optional DDB-Proxy deployment.
-- Suitable for production and long-running workloads.
+| Feature                        | Web App (Default)                     | Container Instance               | Container Apps (Future)     |
+| ------------------------------ | --------------------------------------| -------------------------------- | --------------------------- |
+| **Description**                | Azure App Service                     | Azure Container Instance         | Azure Container Apps        |
+| **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`      | `felddy/foundryvtt:release` |  
+| **Persistent Data**            | Azure Files                           | Azure Files                      | Azure Files                 |
+| **Storage Account Access**     | Private VNET, Public Optional         | Public Only                      | TBC                         |
+| **DDB-Proxy Support**          | Yes (optional)                        | No                               | TBC                         |
+| **DDB-Proxy Docker Image**     | `ghcr.io/mrprimate/ddb-proxy:release` | N/A                              | TBC                         |
+| **Virtual Network Deployment** | Yes (default, enhances security)      | No                               | TBC                         |
+| **Current Status**             | Operational                           | Limited                          | TBC                         |
 
-### ContainerInstance
-
-- Runs Foundry VTT in an Azure Container Instance using the same Docker image.
-- Persistent data is stored in Azure Files.
-- Suitable for development, testing, or short-lived workloads.
-
-> **Note:** Additional compute options (e.g., Container Apps) may be supported in the future.
+> [!NOTE]
+> The ContainerApps option is not currently available, but should be added in the future. If you are interested in this option, please open an issue on the [GitHub repository](https://github.com/PlagueHO/foundryvtt-azure/issues).
 
 ---
 
@@ -95,6 +97,7 @@ azd env set AZURE_LOCATION "EastUS2"
 **Optional parameters:**
 
 ```sh
+azd env set DEPLOY_NETWORK "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
 azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3"
@@ -125,16 +128,18 @@ You can control deployment by setting environment variables before running `azd 
 - `FOUNDRY_ADMIN_KEY` (required): The admin key for Foundry VTT.
 - `AZURE_ENV_NAME`: Name for the environment (used in resource names).
 - `AZURE_LOCATION`: Azure region for deployment.
-- `AZURE_PRINCIPAL_ID`: (optional) User or service principal ID for role assignments.
-- `AZURE_PRINCIPAL_ID_TYPE`: (optional) "User" or "ServicePrincipal".
-- `AZURE_STORAGE_CONFIGURATION`: "Premium_100GB" or "Standard_100GB".
-- `AZURE_DEPLOYMENT_TYPE`: "WebApp" or "ContainerInstance".
-- `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., "P0v3").
-- `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance.
-- `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB`: Memory (GB) for Container Instance.
-- `AZURE_DEPLOY_DDB_PROXY`: "true" or "false" to deploy DDB-Proxy.
-- `AZURE_BASTION_HOST_DEPLOY`: "true" or "false" to deploy Azure Bastion.
-- `AZURE_COMPUTE_SERVICE`: `"WebApp"` or `"ContainerInstance"` (controls the compute service used for Foundry VTT).
+- `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
+- `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`.
+- `DEPLOY_NETWORK`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
+- `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
+- `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
+- `AZURE_DEPLOYMENT_TYPE`: `WebApp` or `ContainerInstance`. Default is `WebApp`.
+- `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., `P1v2`). Default is `P0v3`.
+- `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance, from `1` to `4`. Default is `2`.
+- `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB`: Memory (GB) for Container Instance, from `1` to `16`. Default is `2`.
+- `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy.
+- `AZURE_BASTION_HOST_DEPLOY`: `true` or `false` to deploy Azure Bastion.
+- `AZURE_COMPUTE_SERVICE`: `WebApp` or `ContainerInstance` (controls the compute service used for Foundry VTT).
 
 For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
@@ -294,5 +299,7 @@ jobs:
 [azure-shield]: https://img.shields.io/badge/Azure-Solution%20Accelerator-0078D4?logo=microsoftazure&logoColor=white
 [azure-url]: https://azure.microsoft.com/
 
+[iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
+[iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview
 [iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
 [iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview

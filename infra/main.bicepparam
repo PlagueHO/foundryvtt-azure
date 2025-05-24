@@ -14,11 +14,15 @@ param foundryUsername = readEnvironmentVariable('FOUNDRY_USERNAME', '')
 param foundryPassword = readEnvironmentVariable('FOUNDRY_PASSWORD', '')
 param foundryAdminKey = readEnvironmentVariable('FOUNDRY_ADMIN_KEY', '')
 
+// Network Isolation
+param deployNetworking = toLower(readEnvironmentVariable('DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
+
 // Optional parameters
 param storageConfiguration = readEnvironmentVariable('AZURE_STORAGE_CONFIGURATION', 'Premium_100GB')
-param computeService = readEnvironmentVariable('AZURE_COMPUTE_SERVICE', 'WebApp')
+param storagePublicAccess = toLower(readEnvironmentVariable('AZURE_STORAGE_PUBLIC_ACCESS', 'false')) == 'true' ? true : false
+param computeService = readEnvironmentVariable('AZURE_COMPUTE_SERVICE', 'Web App')
 
-// App Service Plan Parameters (required when ComputeService is set to WebApp)
+// App Service Plan Parameters (required when ComputeService is set to Web App)
 param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SKUNAME', 'P0v3')
 
 // Container Instance Parameters (required when ComputeService is set to ContainerInstance)

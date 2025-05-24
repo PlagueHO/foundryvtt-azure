@@ -47,6 +47,11 @@ param foundryPassword string
 @secure()
 param foundryAdminKey string
 
+// Networking configuration
+
+@sys.description('Deploy a Virtual Network for network isolation. This may be required for some enviornments.')
+param deployNetworking bool = true
+
 // Storage Account configuration
 @sys.description('The configuration of the Azure Storage SKU to use for storing Foundry VTT user data.')
 @allowed([
@@ -55,16 +60,19 @@ param foundryAdminKey string
 ])
 param storageConfiguration string = 'Premium_100GB'
 
+@sys.description('Enable public access to the Azure Storage Account. This is not recommended for production environments.')
+param storagePublicAccess bool = false
+
 // Compute Service configuration
 @sys.description('The compute service to use for deploying Foundry VTT.')
 @allowed([
-  'WebApp'
-  'ContainerInstance'
-  // 'ContainerApp' - not supported yet
+  'Web App'
+  'Container Instance'
+  // 'Container App' - not supported yet
 ])
-param computeService string = 'WebApp'
+param computeService string = 'Web App'
 
-// App Service Plan Parameters (required when ComputeService is set to WebApp)
+// App Service Plan Parameters (required when ComputeService is set to Web App)
 @sys.description('The Azure App Service SKU for running the Foundry VTT server and optionally the DDB-Proxy. Only used when deploying into an Azure Web App.')
 @allowed([
   'F1'
@@ -85,7 +93,7 @@ param computeService string = 'WebApp'
 ])
 param appServicePlanSkuName string = 'P0v3'
 
-// Container Instance Parameters (required when ComputeService is set to ContainerInstance)
+// Container Instance Parameters (required when ComputeService is set to Container Instance)
 @description('The CPUs to assign to the Azure Container Instance for running the Foundry VTT server. Only used when deploying into an Azure Container Instance.')
 @minValue(1)
 @maxValue(4)
@@ -130,6 +138,8 @@ var foundryVttDockerImageTag string = 'release'
 var ddbProxyDockerImageName string = 'ghcr.io/mrprimate/ddb-proxy'
 var ddbProxyDockerImageTag string = 'latest'
 
+var effectiveDeployNetworking = deployNetworking && computeService == 'Web App' // Only deploy networking if using Web App
+
 // ---------- RESOURCE GROUP ----------
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: !empty(resourceGroupName) ? resourceGroupName : 'rg-${environmentName}'
@@ -171,7 +181,7 @@ var subnets = [
   }
 ]
 
-module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = {
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
   scope: rg
   params: {
@@ -185,8 +195,8 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = {
   }
 }
 
-// ---------- PRIVTE DNS ZONES (REQUIRED FOR NETOWRK ISOLATION) ----------
-module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = {
+// ---------- PRIVATE DNS ZONES (REQUIRED FOR NETWORK ISOLATION) ----------
+module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (effectiveDeployNetworking) {
   name: 'storage-file-private-dns-zone'
   scope: rg
   params: {
@@ -209,13 +219,40 @@ var storageConfigurationMap = {
     shareQuota: 100
   }
 }
+var endpoints = effectiveDeployNetworking ? [
+  {
+    name: 'file'
+    privateEndpointConnections: [
+      {
+        privateLinkServiceConnectionState: {
+          status: 'Approved'
+          description: 'Approved by Bicep template'
+        }
+      }
+    ]
+  }
+] : []
+
+var privateEndpoints = effectiveDeployNetworking ? [
+  {
+    privateDnsZoneGroup: {
+      privateDnsZoneGroupConfigs: [
+        {
+          privateDnsZoneResourceId: storageFilePrivateDnsZone.outputs.resourceId
+        }
+      ]
+    }
+    service: 'file'
+    subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // storagePrivateEndpoint
+    tags: tags
+  }
+] : []
 
 module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
   name: 'storage-account-deployment'
   scope: rg
   params: {
     name: storageAccountName
-    allowBlobPublicAccess: false
     enableHierarchicalNamespace: false
     enableNfsV3: false
     enableSftp: false
@@ -226,19 +263,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
           shareQuota: storageConfigurationMap[storageConfiguration].shareQuota
         }
       ]
-      endpoints: [
-        {
-          name: 'file'
-          privateEndpointConnections: [
-            {
-              privateLinkServiceConnectionState: {
-                status: 'Approved'
-                description: 'Approved by Bicep template'
-              }
-            }
-          ]
-        }
-      ]
+      endpoints: endpoints
     }
     kind: storageConfigurationMap[storageConfiguration].kind
     largeFileSharesState: 'Enabled'
@@ -247,29 +272,16 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
     }
-    privateEndpoints: [
-      {
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: [
-            {
-              privateDnsZoneResourceId: storageFilePrivateDnsZone.outputs.resourceId
-            }
-          ]
-        }
-        service: 'file'
-        subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // storagePrivateEndpoint
-        tags: tags
-      }
-    ]
-    publicNetworkAccess: 'Disabled'
+    privateEndpoints: privateEndpoints
+    publicNetworkAccess: storagePublicAccess || ! effectiveDeployNetworking ? 'Enabled' : 'Disabled'
     sasExpirationPeriod: '180.00:00:00'
     skuName: storageConfigurationMap[storageConfiguration].sku
     tags: tags
   }
 }
 
-// ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEBAPP) -------------
-module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeService == 'WebApp') {
+// ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEB APP) -------------
+module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeService == 'Web App') {
   name: 'app-service-plan-deployment'
   scope: rg
   params: {
@@ -283,7 +295,7 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeServ
   }
 }
 
-module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = {
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService == 'Web App') {
   name: 'web-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -361,11 +373,11 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = {
       numberOfWorkers: 1
     }
     tags: tags
-    virtualNetworkSubnetId: virtualNetwork.outputs.subnetResourceIds[2] // webAppIntegration
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // webAppIntegration
   }
 }
 
-module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = {
+module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService == 'Web App' && deployDdbProxy) {
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {
@@ -399,12 +411,12 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = {
       healthCheckPath: '/ping' // Added health check path
     }
     tags: tags
-    virtualNetworkSubnetId: virtualNetwork.outputs.subnetResourceIds[2] // webAppIntegration
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // webAppIntegration
   }
 }
 
 // ------------- CONTAINER INSTANCE (IF COMPUTE SERVICE IS CONTAINER INSTANCE) -------------
-module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.0' = if (computeService == 'ContainerInstance') {
+module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.0' = if (computeService == 'Container Instance') {
   name: 'foundry-vtt-container-group-deployment'
   scope: rg
   params: {
@@ -441,29 +453,13 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
               cpu: containerInstanceCpu
               memoryInGB: containerInstanceMemoryInGB
             }
-          }      
-        }
-      }
-      {
-        name: 'ddbproxy'
-        properties: {
-          environmentVariables: [
+          }
+          volumeMounts: [
             {
-              name: 'VIRTUAL_HOST'
-              secureValue: webAppFoundryVttName
-            }
-            {
-              name: 'VIRTUAL_PORT'
-              secureValue: '3000'
+              name: 'foundrydata'
+              mountPath: '/data'
             }
           ]
-          image: '${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
-          resources: {
-            requests: {
-              cpu: 1
-              memoryInGB: '2.0'
-            }
-          }
         }
       }
     ]
@@ -481,7 +477,6 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
     tags: tags
     volumes: [
       {
-        mountPath: '/data'
         name: 'foundrydata'
         azureFile: {
           shareName: 'foundryvttdata'
@@ -492,6 +487,8 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
     ]
   }
 }
+
+// TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
 // ------------- CONTAINER APPS (IF COMPUTE SERVICE IS CONTAINER APPS) -------------
 // TBC
