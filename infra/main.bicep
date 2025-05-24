@@ -743,13 +743,13 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (effectiv
 }
 
 // WebApp Outputs
-output WEBAPP_FOUNDRY_VTT_URL string = computeService == 'WebApp' ? webAppFoundryVtt.outputs.defaultHostname : ''
-output WEBAPP_DDBPROXY_URL string = computeService == 'WebApp' && deployDdbProxy ? webAppDdbProxy.outputs.defaultHostname : ''
-output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'WebApp' ? webAppFoundryVtt.outputs.resourceId : ''
+output WEBAPP_FOUNDRY_VTT_URL string = computeService == 'Web App' ? webAppFoundryVtt.outputs.defaultHostname : ''
+output WEBAPP_DDBPROXY_URL string = computeService == 'Web App' && deployDdbProxy ? webAppDdbProxy.outputs.defaultHostname : ''
+output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Web App' ? webAppFoundryVtt.outputs.resourceId : ''
 
 // Container Instance Outputs
-output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'ContainerInstance' ? containerGroup.outputs.iPv4Address : ''
-output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'ContainerInstance' ? containerGroup.outputs.resourceId : ''
+output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'Container Instance' ? containerGroup.outputs.iPv4Address : ''
+output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Container Instance' ? containerGroup.outputs.resourceId : ''
 
 // Azure Container Apps Outputs
 // TBC
@@ -769,3 +769,6 @@ output KEY_VAULT_RESOURCE_ID string = keyVault.outputs.resourceId
 // Log Analytics Outputs
 output LOG_ANALYTICS_WORKSPACE_NAME string = deployDiagnostics ? logAnalyticsWorkspace.outputs.name : ''
 output LOG_ANALYTICS_WORKSPACE_RESOURCE_ID string = deployDiagnostics ? logAnalyticsWorkspace.outputs.resourceId : ''
+
+// Foundry VTT URL
+output FOUNDRY_VTT_URL string = computeService == 'Web App' ? 'https://${webAppFoundryVtt.outputs.defaultHostname}/' : (computeService == 'Container Instance' ? 'http://${containerGroup.outputs.iPv4Address}:30000/' : '')

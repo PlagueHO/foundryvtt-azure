@@ -159,21 +159,34 @@ For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
 ## Outputs
 
-After deployment, `azd up` will output resource URLs and connection info, including:
+After deployment, `azd up` will output the URL to your Foundry VTT server:
 
-- Foundry VTT Web App URL
-- DDB-Proxy URL (if enabled)
-- Resource group name
-- Bastion Host info (if enabled)
-- Log Analytics Workspace info (if enabled)
+
 
 ---
 
 ## Next Steps
 
 - Access your Foundry VTT server using the output URL.
-- If you enabled DDB-Proxy, configure your Foundry VTT DDB-Importer plugin as described in the [DDB-Proxy documentation](https://github.com/MrPrimate/ddb-proxy).
+- If you enabled DDB-Proxy, configure your Foundry VTT DDB-Importer plugin to use the proxy URL. See the [DDB-Proxy section](#ddb-proxy) below for details.
 - If you enabled Bastion, use Azure Bastion for secure access to private resources.
+
+---
+
+### DDB-Proxy
+
+The workflow will also optionally deploy a [DDB-Proxy](https://github.com/MrPrimate/ddb-proxy) into the App Service Plan for use with the awesome [DDB-Importer](https://github.com/MrPrimate/ddb-importer) plugin for Foundry VTT.
+
+- `DEPLOY_DDBPROXY`: Setting this variable to true will deploy a DDB-Proxy into the same App Service Plan as the Foundry VTT server, but on a different URL.
+
+Once you have deployed a DDB-Proxy into your App Service Plan you will be able to configure your Foundry VTT to use it by running the following commands in your browsers developer console:
+
+```javascript
+game.settings.set("ddb-importer", "custom-proxy", true);
+game.settings.set("ddb-importer", "api-endpoint", "https://<BASE_RESOURCE_NAME>ddbproxy.azurewebsites.net");
+```
+
+For more information on how to use the DDB-Proxy with Foundry VTT, please see the [DDB-Proxy documentation](https://github.com/MrPrimate/ddb-proxy).
 
 ---
 
@@ -181,13 +194,14 @@ After deployment, `azd up` will output resource URLs and connection info, includ
 
 The solution deploys:
 
-- Azure Resource Group
-- Virtual Network with subnets for storage, web app, container group, and Bastion
-- Azure Storage Account (Azure Files)
-- Azure Web App (Linux container) or Azure Container Instance
-- (Optional) DDB-Proxy container
-- (Optional) Azure Bastion
-- (Optional) Azure Log Analytics Workspace (if `AZURE_DEPLOY_DIAGNOSTICS` is `true`)
+- **Azure Resource Group** to contain all resources
+- **Virtual Network** with subnets for storage, web app, container group, and Bastion (optional)
+- **Azure Storage Account** using Azure Files to store Foundry VTT data
+- **Azure Key Vault** for storage account keys and Foundry VTT secrets
+- **Azure Web App** or **Azure Container Instance** for Foundry VTT hosting
+- **Azure Web App** for hosting DDB-Proxy (optional)
+- **Azure Bastion** for secure access to private resources if using a Virtual Network (optional)
+- **Azure Log Analytics Workspace** for diagnostics and monitoring (optional)
 
 ---
 
@@ -201,19 +215,7 @@ azd down
 
 ---
 
-## Contributing
-
-Contributions are welcome! Please open issues or pull requests.
-
----
-
-## License
-
-[MIT](LICENSE)
-
----
-
-## GitHub Actions
+## Deploy with GitHub Actions
 
 You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for team-based or production deployments.
 
@@ -298,6 +300,18 @@ jobs:
           # Set other variables as needed
           azd env set AZURE_DEPLOY_DIAGNOSTICS "true" # Example: enable diagnostics in CI
 ```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests.
+
+---
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
