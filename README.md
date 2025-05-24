@@ -1,139 +1,298 @@
-# foundryvtt-azure
+# FoundryVTT Azure Solution Accelerator
 
 [![deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml/badge.svg)](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml)
+[![CD][cd-shield]][cd-url]
+[![License][license-shield]][license-url]
+[![Azure][azure-shield]][azure-url]
+[![IaC][iac-shield]][iac-url]
 
-Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (that you've purchased a license for) to Azure using Azure Bicep and GitHub Actions.
+Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (with a valid license) to Azure using the [Azure Developer CLI (azd)](https://aka.ms/install-azd) and Bicep.
 
-The project uses GitHub actions to deploy the resources to Azure using the [GitHub Action for Azure Resource Manager (ARM) deployment task](https://github.com/Azure/arm-deploy) and [Azure Bicep](https://aka.ms/Bicep).
+This solution accelerator provisions a secure, flexible, and updatable Foundry VTT environment in Azure, using best practices for resource isolation, managed identities, and persistent storage.
 
-This repository will deploy a Foundry Virtual Table top using various different Azure architectures to suit your requirements. The compute and storage is separated into different services to enable update and redeployment of the server without loss of the Foundry VTT data.
+---
 
-> IMPORTANT NOTE: This project has been to use Azure AD Workload Identity for the workflow to connect to Azure. Please see [Configuring Workload Identity Federation for GitHub Actions workflow](#configuring-workload-identity-federation-for-github-actions-workflow) for more information.
+## Requirements
 
-You can choose how to deploy by setting the `SCHEDULED_DEPLOYMENT_ENABLED` repository variable. If set to `true`, GitHub Actions will automatically deploy on a schedule (default: daily at 2am NZT, UTC+12). Otherwise, it will deploy only mnaually or on a push.
+Before you begin, ensure you have:
 
-You can choose which Azure architecture to use by setting the `TYPE` repository variable in the [deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml) workflow.
+1. An active Azure subscription ([Create a free account](https://azure.microsoft.com/free/)).
+2. [Azure Developer CLI (azd)](https://aka.ms/install-azd) installed and updated.
+3. **Windows Only:** [PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) (for local development).
+4. (Recommended) [Python 3.10+](https://www.python.org/downloads/) for sample tools.
 
-The available architectures are (prefixed by the `TYPE` value to provide in the workflow):
+---
 
-- `AAS` (Default): [Azure App Service for Linux Containers and Azure Files](#azure-app-service-for-linux-containers-and-azure-files).
-- `ACI`: [Azure Container Instances with Azure Files](#azure-container-instances-with-azure-files).
-- Azure Container Instances with Azure Files and Azure Front Door - planned.
-- Azure Kubernetes Service with Azure App Gateway with Ingres controller (AGIC) - planned.
-- Azure Virtual Machines - not planned as there are other projects that covers this architecture.
+## Key Features
 
-> IMPORTANT NOTE: You must have a valid [Foundry VTT license](https://foundryvtt.com/) attached to your account. If you don't have one, you can [buy one here](https://foundryvtt.com/purchase/).
+- **Zero-trust**: Deploys resources into a virtual network with private endpoints and disables public access by default.
+- **Managed identities**: Uses managed identities for secure resource authentication.
+- **Azure Verified Modules**: Leverages [Azure Verified Modules](https://aka.ms/avm) for infrastructure.
+- **Flexible compute**: Supports Azure Web App (Linux container) or Azure Container Instance.
+- **Persistent storage**: Uses Azure Files for Foundry VTT data.
+- **Optional DDB-Proxy**: Deploy [DDB-Proxy](https://github.com/MrPrimate/ddb-proxy) for [DDB-Importer](https://github.com/MrPrimate/ddb-importer) plugin support.
+- **Optional Bastion Host**: Deploy Azure Bastion for secure access.
 
-## Azure App Service for Linux Containers and Azure Files
+---
 
-This method will deploy an [Azure App Service Web App running Linux Containers](https://learn.microsoft.com/azure/app-service/configure-custom-container) and attach an Azure Storage account with an SMB share for persistent storage.
+## Compute Service Options
 
-> IMPORTANT: It is best practice to put the Storage Account in a VNET and disable public access. A VNET will be created and the Storage Account and App Service will be put into it. This will prevent public access to the Storage Account. The App Service will still be publically accessible.
+You can choose which Azure compute service to use for running Foundry VTT by setting the `AZURE_COMPUTE_SERVICE` environment variable before deployment. Supported options:
 
-It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
+- **WebApp** (default): Deploys Foundry VTT as a Linux container in Azure App Service. Recommended for most users.
+- **ContainerInstance**: Deploys Foundry VTT in an Azure Container Instance. Useful for lightweight or temporary workloads.
 
-The following repository variables should be configured to define the region to deploy to and the storage and container configuration:
+Set the compute service using:
 
-- `TYPE`: Should be set to `AAS` to deploy the Azure App Service for Linux Containers and Azure Files architecture.
-- `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
-- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
-- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
-- `APPSERVICEPLAN_CONFIGURATION`: The configuration of the Azure App Service Plan for running the Foundry VTT server. Must be one of `B1`, `P1V2`, `P2V2`, `P3V2`, `P0V3`, `P1V3`, `P2V3`, `P3V3`.
-
-Your variables should look similar to this:
-![Example of GitHub Variables](/images/github-variables-example.png)
-
-The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Web App DNS are globally unique and provide access to your Azure subscription for deployment:
-
-- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
-- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
-- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-- `FOUNDRY_USERNAME`: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release` container image.
-- `FOUNDRY_PASSWORD`: Your Foundry VTT password. This is used by the `felddy/foundryvtt:release` container image.
-- `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
-
-These values should be kept secret and care taken to ensure they are not shared with anyone.
-Your secrets should look like this:
-![Example of GitHub Secrets](/images/github-secrets-example.png)
-
-### DDB-Proxy
-
-The workflow will also optionally deploy a [DDB-Proxy](https://github.com/MrPrimate/ddb-proxy) into the App Service Plan for use with the awesome [DDB-Importer](https://github.com/MrPrimate/ddb-importer) plugin for Foundry VTT.
-
-- `DEPLOY_DDBPROXY`: Setting this variable to true will deploy a DDB-Proxy into the same App Service Plan as the Foundry VTT server, but on a different URL.
-
-Once you have deployed a DDB-Proxy into your App Service Plan you will be able to configure your Foundry VTT to use it by running the following commands in your browsers developer console:
-
-```javascript
-game.settings.set("ddb-importer", "custom-proxy", true);
-game.settings.set("ddb-importer", "api-endpoint", "https://<BASE_RESOURCE_NAME>ddbproxy.azurewebsites.net");
+```sh
+azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 ```
 
-## Azure Container Instances with Azure Files
+### WebApp (Linux Container)
 
-> IMPORTANT: It is best practice to put the Storage Account in a VNET and disable public access. However, this is not currently supported by this deployment method yet. I plan to implement this in future.
+- Runs Foundry VTT in an Azure App Service (Linux) using the `felddy/foundryvtt:release` Docker image.
+- Persistent data is stored in Azure Files.
+- Supports optional DDB-Proxy deployment.
+- Suitable for production and long-running workloads.
 
-This method will deploy an [Azure Container Instance](https://learn.microsoft.com/azure/container-instances/container-instances-overview) and attach an Azure Storage account with an SMB share for persistent storage.
+### ContainerInstance
 
-It uses the `felddy/foundryvtt:release` container image from Docker Hub. The source and documentation for this container image can be found [here](https://github.com/felddy/foundryvtt-docker). It will use your Foundry VTT username and password to download the Foundry VTT application files and register it with your license key.
+- Runs Foundry VTT in an Azure Container Instance using the same Docker image.
+- Persistent data is stored in Azure Files.
+- Suitable for development, testing, or short-lived workloads.
 
-The following variables should be configured in the repository to define the region to deploy to and the storage and container configuration:
+> **Note:** Additional compute options (e.g., Container Apps) may be supported in the future.
 
-- `TYPE`: Should be set to `ACI` to deploy an Azure Container Instance.
-- `LOCATION`: The Azure region to deploy the resources to. For example, `AustraliaEast`.
-- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
-- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
-- `STORAGE_CONFIGURATION`: The configuration of the Azure Storage SKU to use for storing Foundry VTT user data. Must be one of `Premium_100GB` or `Standard_100GB`.
-- `CONTAINER_CONFIGURATION`: The configuration of the Azure Container Instance for running the Foundry VTT server. Must be one of `Small`, `Medium` or `Large`.
+---
 
-The following GitHub Secrets need to be defined to ensure that resource names for Storage Account and Container DNS are globally unique and provide access to your Azure subscription for deployment:
+## Deploying with Azure Developer CLI
 
-- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal used to authenticate to Azure. This is generated as part of configuring Workload Identity Federation.
-- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal used to authenticate to Azure.
-- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-- `BASE_RESOURCE_NAME`: The base name that will prefixed to all Azure resources deployed to ensure they are unique. For example, `myfvtt`.
-- `RESOURCE_GROUP_NAME`: The name of the Azure resource group to create and add the resources to. For example, `myfvtt-rg`.
-- `FOUNDRY_USERNAME`: Your Foundry VTT username. This is used by the `felddy/foundryvtt:release` container image.
-- `FOUNDRY_PASSWORD`: Your Foundry VTT password. This is used by the `felddy/foundryvtt:release` container image.
-- `FOUNDRY_ADMIN_KEY`: The admin key to set Foundry VTT up with. This will be the administrator password you log into the Foundry VTT server with.
+### 1. Clone the repository
 
-These values should be kept secret and care taken to ensure they are not shared with anyone.
-
-Your secrets should look like this:
-![Example of GitHub Secrets](/images/github-secrets-example.png)
-
-### Azure Bastion
-
-Because this architecture deploys the storage account into a virtual network using private endpoints and disables public access, you will need to use [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) to access the storage account and the container instance. To deploy Azure Bastion, set the `DEPLOY_BASTION` repository variable to `true`.
-
-- `DEPLOY_BASTION`: Setting this variable to true will deploy an Azure Bastion into the same resource group.
-
-## Configuring Workload Identity Federation for GitHub Actions workflow
-
-Customize and run this code in Azure Cloud Shell to create the credential for the GitHub workflow to use to deploy to Azure.
-[Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation) will be used by GitHub Actions to authenticate to Azure.
-
-```powershell
-$credentialname = '<The name to use for the credential & app>' # e.g., github-dsrfoundryvtt-workflow
-$application = New-AzADApplication -DisplayName $credentialname
-$policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main" # e.g., repo:PlagueHO/foundryvtt-azure:ref:refs/heads/main
-$subscriptionId = '<your Azure subscription>'
-
-New-AzADAppFederatedCredential `
-    -Name $credentialname `
-    -ApplicationObjectId $application.Id `
-    -Issuer 'https://token.actions.githubusercontent.com' `
-    -Audience 'api://AzureADTokenExchange' `
-    -Subject $policy
-New-AzADServicePrincipal -AppId $application.AppId
-
-New-AzRoleAssignment `
-  -ApplicationId $application.AppId `
-  -RoleDefinitionName Contributor `
-  -Scope "/subscriptions/$subscriptionId" `
-  -Description "The GitHub Actions deployment workflow for Foundry VTT."
+```sh
+git clone https://github.com/PlagueHO/foundryvtt-azure.git
+cd foundryvtt-azure
 ```
 
-To learn how to configure Workload Identity Federation with GitHub Actions, see [this Microsoft Learn Module](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
-Please see [this document](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) for more information on Workload Identities.
+### 2. Authenticate with Azure
+
+```sh
+azd auth login
+```
+
+### 3. Configure environment variables
+
+Set required and optional parameters using `azd env set`. For example:
+
+```sh
+azd env set FOUNDRY_USERNAME "<your-foundry-username>"
+azd env set FOUNDRY_PASSWORD "<your-foundry-password>"
+azd env set FOUNDRY_ADMIN_KEY "<your-foundry-admin-key>"
+azd env set AZURE_ENV_NAME "myfoundryenv"
+azd env set AZURE_LOCATION "EastUS2"
+```
+
+**Optional parameters:**
+
+```sh
+azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
+azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
+azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3"
+azd env set AZURE_CONTAINER_INSTANCE_CPU "2"
+azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2"
+azd env set AZURE_DEPLOY_DDB_PROXY "false"
+azd env set AZURE_BASTION_HOST_DEPLOY "false"
+```
+
+> See [Configuration Options](#configuration-options) for all available variables.
+
+### 4. Provision and deploy
+
+```sh
+azd up
+```
+
+This command will provision all Azure resources and deploy Foundry VTT using the parameters you set.
+
+---
+
+## Configuration Options
+
+You can control deployment by setting environment variables before running `azd up`. The main parameters (see `infra/main.bicepparam`) are:
+
+- `FOUNDRY_USERNAME` (required): Your Foundry VTT username.
+- `FOUNDRY_PASSWORD` (required): Your Foundry VTT password.
+- `FOUNDRY_ADMIN_KEY` (required): The admin key for Foundry VTT.
+- `AZURE_ENV_NAME`: Name for the environment (used in resource names).
+- `AZURE_LOCATION`: Azure region for deployment.
+- `AZURE_PRINCIPAL_ID`: (optional) User or service principal ID for role assignments.
+- `AZURE_PRINCIPAL_ID_TYPE`: (optional) "User" or "ServicePrincipal".
+- `AZURE_STORAGE_CONFIGURATION`: "Premium_100GB" or "Standard_100GB".
+- `AZURE_DEPLOYMENT_TYPE`: "WebApp" or "ContainerInstance".
+- `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., "P0v3").
+- `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance.
+- `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB`: Memory (GB) for Container Instance.
+- `AZURE_DEPLOY_DDB_PROXY`: "true" or "false" to deploy DDB-Proxy.
+- `AZURE_BASTION_HOST_DEPLOY`: "true" or "false" to deploy Azure Bastion.
+- `AZURE_COMPUTE_SERVICE`: `"WebApp"` or `"ContainerInstance"` (controls the compute service used for Foundry VTT).
+
+For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
+
+---
+
+## Outputs
+
+After deployment, `azd up` will output resource URLs and connection info, including:
+
+- Foundry VTT Web App URL
+- DDB-Proxy URL (if enabled)
+- Resource group name
+- Bastion Host info (if enabled)
+
+---
+
+## Next Steps
+
+- Access your Foundry VTT server using the output URL.
+- If you enabled DDB-Proxy, configure your Foundry VTT DDB-Importer plugin as described in the [DDB-Proxy documentation](https://github.com/MrPrimate/ddb-proxy).
+- If you enabled Bastion, use Azure Bastion for secure access to private resources.
+
+---
+
+## Architecture
+
+The solution deploys:
+
+- Azure Resource Group
+- Virtual Network with subnets for storage, web app, container group, and Bastion
+- Azure Storage Account (Azure Files)
+- Azure Web App (Linux container) or Azure Container Instance
+- (Optional) DDB-Proxy container
+- (Optional) Azure Bastion
+
+---
+
+## Deleting the Deployment
+
+To delete all resources created by this deployment:
+
+```sh
+azd down
+```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests.
+
+---
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+## GitHub Actions
+
+You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for team-based or production deployments.
+
+### 1. Configure GitHub Secrets and Variables
+
+Set the following repository **secrets** in your GitHub repository:
+
+- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal or Workload Identity used to authenticate to Azure.
+- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal or Workload Identity.
+- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
+- `FOUNDRY_USERNAME`: Your Foundry VTT username.
+- `FOUNDRY_PASSWORD`: Your Foundry VTT password.
+- `FOUNDRY_ADMIN_KEY`: The admin key for Foundry VTT.
+
+Set the following repository **variables** as needed:
+
+- `AZURE_ENV_NAME`, `AZURE_LOCATION`, `AZURE_COMPUTE_SERVICE`, etc. (see [Configuration Options](#configuration-options)).
+
+### 2. Configure Workload Identity Federation
+
+To securely authenticate your GitHub Actions workflow to Azure, configure [Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation):
+
+1. Create an Azure AD Application and Federated Credential for your GitHub repository:
+
+   ```powershell
+   $credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow
+   $application = New-AzADApplication -DisplayName $credentialname
+   $policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main"
+   $subscriptionId = '<your Azure subscription>'
+
+   New-AzADAppFederatedCredential `
+       -Name $credentialname `
+       -ApplicationObjectId $application.Id `
+       -Issuer 'https://token.actions.githubusercontent.com' `
+       -Audience 'api://AzureADTokenExchange' `
+       -Subject $policy
+   New-AzADServicePrincipal -AppId $application.AppId
+
+   New-AzRoleAssignment `
+     -ApplicationId $application.AppId `
+     -RoleDefinitionName Contributor `
+     -Scope "/subscriptions/$subscriptionId" `
+     -Description "The GitHub Actions deployment workflow for Foundry VTT."
+   ```
+
+   For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
+
+### 3. Example GitHub Actions Workflow
+
+A sample workflow file (`.github/workflows/deploy-foundryvtt.yml`) should:
+
+- Authenticate to Azure using workload identity.
+- Run `azd up` to provision and deploy the solution.
+- Use the secrets and variables as environment variables.
+
+Example snippet:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
+
+      - name: Set up Azure Developer CLI
+        uses: Azure/setup-azd@v1
+
+      - name: Set environment variables
+        run: |
+          azd env set FOUNDRY_USERNAME "${{ secrets.FOUNDRY_USERNAME }}"
+          azd env set FOUNDRY_PASSWORD "${{ secrets.FOUNDRY_PASSWORD }}"
+          azd env set FOUNDRY_ADMIN_KEY "${{ secrets.FOUNDRY_ADMIN_KEY }}"
+          # Set other variables as needed
+
+      - name: Deploy Foundry VTT
+        run: azd up --no-prompt
+```
+
+---
+
+<!-- Badge reference links -->
+[cd-shield]: https://img.shields.io/github/actions/workflow/status/PlagueHO/foundryvtt-azure/continuous-delivery.yml?branch=main&label=CD
+[cd-url]: https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/continuous-delivery.yml
+
+[license-shield]: https://img.shields.io/github/license/PlagueHO/foundryvtt-azure
+[license-url]: https://github.com/PlagueHO/foundryvtt-azure/blob/main/LICENSE
+
+[azure-shield]: https://img.shields.io/badge/Azure-Solution%20Accelerator-0078D4?logo=microsoftazure&logoColor=white
+[azure-url]: https://azure.microsoft.com/
+
+[iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
+[iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview

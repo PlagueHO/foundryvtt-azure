@@ -1,0 +1,534 @@
+targetScope = 'subscription'
+
+// General configuration provided by Azure Developer CLI
+@sys.description('Name of the the environment which is used to generate a short unique hash used in all resources')
+@minLength(1)
+@maxLength(64)
+param environmentName string
+
+@sys.description('Location for all resources')
+@minLength(1)
+@metadata({
+  azd: {
+    type: 'location'
+  }
+})
+param location string
+
+// User or service principal deploying the resources
+@sys.description('Id of the user or app to assign application roles.')
+param principalId string
+
+@sys.description('Type of the principal referenced by principalId.')
+@allowed([
+  'User'
+  'ServicePrincipal'
+])
+param principalIdType string = 'User'
+
+@sys.description('The Azure resource group where new resources will be deployed.')
+@metadata({
+  azd: {
+    type: 'resourceGroup'
+  }
+})
+param resourceGroupName string = 'rg-${environmentName}'
+
+// Configuration for the Foundry VTT server - Required
+@sys.description('Your Foundry VTT username.')
+@secure()
+param foundryUsername string
+
+@sys.description('Your Foundry VTT password.')
+@secure()
+param foundryPassword string
+
+@sys.description('The admin key to set Foundry VTT up with.')
+@secure()
+param foundryAdminKey string
+
+// Storage Account configuration
+@sys.description('The configuration of the Azure Storage SKU to use for storing Foundry VTT user data.')
+@allowed([
+  'Premium_100GB'
+  'Standard_100GB'
+])
+param storageConfiguration string = 'Premium_100GB'
+
+// Compute Service configuration
+@sys.description('The compute service to use for deploying Foundry VTT.')
+@allowed([
+  'WebApp'
+  'ContainerInstance'
+  // 'ContainerApp' - not supported yet
+])
+param computeService string = 'WebApp'
+
+// App Service Plan Parameters (required when ComputeService is set to WebApp)
+@sys.description('The Azure App Service SKU for running the Foundry VTT server and optionally the DDB-Proxy. Only used when deploying into an Azure Web App.')
+@allowed([
+  'F1'
+  'B1'
+  'B2'
+  'B3'
+  'P1v2'
+  'P2v2'
+  'P3v2'
+  'P0v3'
+  'P1v3'
+  'P2v3'
+  'P3v3'
+  'P0v4'
+  'P1v4'
+  'P2v4'
+  'P3v4'
+])
+param appServicePlanSkuName string = 'P0v3'
+
+// Container Instance Parameters (required when ComputeService is set to ContainerInstance)
+@description('The CPUs to assign to the Azure Container Instance for running the Foundry VTT server. Only used when deploying into an Azure Container Instance.')
+@minValue(1)
+@maxValue(4)
+param containerInstanceCpu int = 2
+
+@description('The Memory in GB to assign to the Azure Container Instance for running the Foundry VTT server. Only used when deploying into an Azure Container Instance.')
+// Allowed values are 0.5 increments from 1 to 16
+@allowed(['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13', '13.5', '14', '14.5', '15', '15.5', '16'])
+param containerInstanceMemoryInGB string = '2'
+
+// Azure Contaier Apps Parameters (required when ComputeService is set to ContainerApps)
+// TBC
+
+// Deploy a DDB Proxy
+@sys.description('Deploy a D&D Beyond proxy into the app service plan.')
+param deployDdbProxy bool = false
+
+// Deploy a Bastion Host into the Virtual Network
+@sys.description('Deploy a Bastion host into the VNET.')
+param bastionHostDeploy bool = false
+
+// tags that should be applied to all resources.
+var tags = {
+  'azd-env-name': environmentName
+}
+
+// Load the abbreviations from the JSON file
+var abbrs = loadJsonContent('./abbreviations.json')
+
+// Resource names
+var virtualNetworkName string = '${abbrs.networkVirtualNetworks}${environmentName}'
+var storageAccountName string = take(toLower(replace(environmentName, '-', '')),24)
+var appServicePlanName string = take('${abbrs.webSitesAppService}${environmentName}',60)
+var webAppFoundryVttName string = environmentName
+var webAppDdbProxyName string = '${environmentName}ddbproxy'
+var containerInstanceFoundryVttName string = '${abbrs.containerInstanceContainerGroups}${environmentName}'
+var bastionHostName string = '${abbrs.networkBastionHosts}${environmentName}'
+
+// Docker image names and tags
+var foundryVttDockerImageName string = 'felddy/foundryvtt'
+var foundryVttDockerImageTag string = 'release'
+var ddbProxyDockerImageName string = 'ghcr.io/mrprimate/ddb-proxy'
+var ddbProxyDockerImageTag string = 'latest'
+
+// ---------- RESOURCE GROUP ----------
+resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: !empty(resourceGroupName) ? resourceGroupName : 'rg-${environmentName}'
+  location: location
+  tags: tags
+}
+
+// ---------- NETWORKING ----------
+var subnets = [
+  {
+    // Default subnet (generally not used)
+    name: 'default'
+    addressPrefix: '10.0.0.0/24'
+  }
+  {
+    // storagePrivateEndpoint Subnet (Storage Account private endpoints)
+    name: 'storagePrivateEndpoint'
+    addressPrefix: '10.0.1.0/24'
+    privateEndpointNetworkPolicies: 'Disabled'
+  }
+  {
+    // webApp Integration Subnet (App Service private endpoints)
+    // Only used when deploying into an Azure Container Web App
+    name: 'webAppIntegration'
+    addressPrefix: '10.0.2.0/24'
+    delegation: 'Microsoft.Web/serverFarms'
+  }
+  {
+    // Container Registry Subnet (ACR private endpoints)
+    // Only used when deploying into an Azure Container Instance
+    name: 'containerGroupSubnet'
+    addressPrefix: '10.0.3.0/24'
+  }
+  {
+    // Azure Bastion Subnet (Bastion Host)
+    // Only used when deploying an Azure Bastion Host
+    name: 'AzureBastionSubnet'
+    addressPrefix: '10.0.10.0/27'
+  }
+]
+
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = {
+  name: 'virtualNetwork'
+  scope: rg
+  params: {
+    name: virtualNetworkName
+    location: location
+    addressPrefixes: [
+      '10.0.0.0/16'
+    ]
+    subnets: subnets
+    tags: tags
+  }
+}
+
+// ---------- PRIVTE DNS ZONES (REQUIRED FOR NETOWRK ISOLATION) ----------
+module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = {
+  name: 'storage-file-private-dns-zone'
+  scope: rg
+  params: {
+    name: 'privatelink.file.${environment().suffixes.storage}'
+    location: 'global'
+    tags: tags
+  }
+}
+
+// ----------- STORAGE ACCOUNT -----------
+var storageConfigurationMap = {
+  Premium_100GB: {
+    kind: 'FileStorage'
+    sku: 'Premium_LRS'
+    shareQuota: 100
+  }
+  Standard_100GB: {
+    kind: 'StorageV2'
+    sku: 'Standard_LRS'
+    shareQuota: 100
+  }
+}
+
+module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
+  name: 'storage-account-deployment'
+  scope: rg
+  params: {
+    name: storageAccountName
+    allowBlobPublicAccess: false
+    enableHierarchicalNamespace: false
+    enableNfsV3: false
+    enableSftp: false
+    fileServices: {
+      shares: [
+        {
+          name: 'foundryvttdata'
+          shareQuota: storageConfigurationMap[storageConfiguration].shareQuota
+        }
+      ]
+      endpoints: [
+        {
+          name: 'file'
+          privateEndpointConnections: [
+            {
+              privateLinkServiceConnectionState: {
+                status: 'Approved'
+                description: 'Approved by Bicep template'
+              }
+            }
+          ]
+        }
+      ]
+    }
+    kind: storageConfigurationMap[storageConfiguration].kind
+    largeFileSharesState: 'Enabled'
+    location: location
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+    }
+    privateEndpoints: [
+      {
+        privateDnsZoneGroup: {
+          privateDnsZoneGroupConfigs: [
+            {
+              privateDnsZoneResourceId: storageFilePrivateDnsZone.outputs.resourceId
+            }
+          ]
+        }
+        service: 'file'
+        subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // storagePrivateEndpoint
+        tags: tags
+      }
+    ]
+    publicNetworkAccess: 'Disabled'
+    sasExpirationPeriod: '180.00:00:00'
+    skuName: storageConfigurationMap[storageConfiguration].sku
+    tags: tags
+  }
+}
+
+// ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEBAPP) -------------
+module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeService == 'WebApp') {
+  name: 'app-service-plan-deployment'
+  scope: rg
+  params: {
+    name: appServicePlanName
+    kind: 'linux'
+    location: location
+    skuCapacity: 1
+    skuName: appServicePlanSkuName
+    tags: tags
+    zoneRedundant: false
+  }
+}
+
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = {
+  name: 'web-app-foundry-vtt-deployment'
+  scope: rg
+  params: {
+    kind: 'app,linux,container'
+    name: webAppFoundryVttName
+    configs: [
+      {
+        name: 'azurestorageaccounts'
+        properties: {
+          foundryvttdata: {
+            accessKey: listkeys(resourceId(subscription().subscriptionId , resourceGroupName, 'Microsoft.Storage/storageAccounts', storageAccountName), '2024-01-01').keys[0].value
+            accountName: storageAccountName
+            protocol: 'Smb'
+            mountPath: '/data'
+            shareName: 'foundryvttdata'
+            type: 'AzureFiles'
+          }
+        }
+      }
+    ]
+    serverFarmResourceId: appServicePlan.outputs.resourceId
+    siteConfig: {
+      alwaysOn: true
+      appSettings: [
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: ''
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://index.docker.io/v1'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: ''
+        }
+        {
+          name: 'FOUNDRY_USERNAME'
+          value: foundryUsername
+        }
+        {
+          name: 'FOUNDRY_PASSWORD'
+          value: foundryPassword
+        }
+        {
+          name: 'FOUNDRY_ADMIN_KEY'
+          value: foundryAdminKey
+        }
+        {
+          name: 'FOUNDRY_MINIFY_STATIC_FILES'
+          value: 'true'
+        }
+        // Set the container start time limit to max because Foundry VTT
+        // container may take some time to start up depending on the number
+        // of modules added.
+        {
+          name: 'WEBSITES_CONTAINER_START_TIME_LIMIT'
+          value: '1800'
+        }
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
+        }
+        {
+          name: 'WEBSITES_PORT'
+          value: '30000'
+        }
+      ]
+      detailedErrorLoggingEnabled: true
+      ftpsState: 'FtpsOnly'
+      httpLoggingEnabled: true
+      logsDirectorySizeLimit: 35
+      linuxFxVersion: 'DOCKER|${foundryVttDockerImageName}:${foundryVttDockerImageTag}'
+      minTlsVersion: '1.2'
+      numberOfWorkers: 1
+    }
+    tags: tags
+    virtualNetworkSubnetId: virtualNetwork.outputs.subnetResourceIds[2] // webAppIntegration
+  }
+}
+
+module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = {
+  name: 'web-app-ddbproxy-deployment'
+  scope: rg
+  params: {
+    kind: 'app,linux,container'
+    name: webAppDdbProxyName
+    serverFarmResourceId: appServicePlan.outputs.resourceId
+    siteConfig: {
+      numberOfWorkers: 1
+      linuxFxVersion: 'DOCKER|${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
+      alwaysOn: true
+      appSettings: [
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
+        }
+        {
+          name: 'VIRTUAL_HOST'
+          value: webAppFoundryVttName
+        }
+        {
+          name: 'VIRTUAL_PORT'
+          value: '3000'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://ghcr.io'
+        }
+      ]
+      ftpsState: 'FtpsOnly'
+      minTlsVersion: '1.2'
+      healthCheckPath: '/ping' // Added health check path
+    }
+    tags: tags
+    virtualNetworkSubnetId: virtualNetwork.outputs.subnetResourceIds[2] // webAppIntegration
+  }
+}
+
+// ------------- CONTAINER INSTANCE (IF COMPUTE SERVICE IS CONTAINER INSTANCE) -------------
+module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.0' = if (computeService == 'ContainerInstance') {
+  name: 'foundry-vtt-container-group-deployment'
+  scope: rg
+  params: {
+    name: containerInstanceFoundryVttName
+    location: location
+    availabilityZone: 1
+    containers: [
+      {
+        name: 'foundryvtt'
+        properties: {
+          environmentVariables: [
+            {
+              name: 'FOUNDRY_USERNAME'
+              secureValue: foundryUsername
+            }
+            {
+              name: 'FOUNDRY_PASSWORD'
+              secureValue: foundryPassword
+            }
+            {
+              name: 'FOUNDRY_ADMIN_KEY'
+              secureValue: foundryAdminKey
+            }
+          ]
+          image: '${foundryVttDockerImageName}:${foundryVttDockerImageTag}'
+          ports: [
+            {
+              protocol: 'TCP'
+              port: 30000
+            }
+          ]
+          resources: {
+            requests: {
+              cpu: containerInstanceCpu
+              memoryInGB: containerInstanceMemoryInGB
+            }
+          }      
+        }
+      }
+      {
+        name: 'ddbproxy'
+        properties: {
+          environmentVariables: [
+            {
+              name: 'VIRTUAL_HOST'
+              secureValue: webAppFoundryVttName
+            }
+            {
+              name: 'VIRTUAL_PORT'
+              secureValue: '3000'
+            }
+          ]
+          image: '${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
+          resources: {
+            requests: {
+              cpu: 1
+              memoryInGB: '2.0'
+            }
+          }
+        }
+      }
+    ]
+    ipAddress: {
+      ports: [
+        {
+          protocol: 'TCP'
+          port: 30000
+        }
+      ]
+      type: 'Public'
+      dnsNameLabel: environmentName
+    }
+    osType: 'Linux'
+    tags: tags
+    volumes: [
+      {
+        mountPath: '/data'
+        name: 'foundrydata'
+        azureFile: {
+          shareName: 'foundryvttdata'
+          storageAccountName: storageAccountName
+          storageAccountKey: listkeys(resourceId(subscription().subscriptionId , resourceGroupName, 'Microsoft.Storage/storageAccounts', storageAccountName), '2024-01-01').keys[0].value
+        }
+      }
+    ]
+  }
+}
+
+// ------------- CONTAINER APPS (IF COMPUTE SERVICE IS CONTAINER APPS) -------------
+// TBC
+
+// ------------- BASTION HOST (OPTIONAL) -------------
+module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (bastionHostDeploy) {
+  name: 'bastion-host-deployment'
+  scope: rg
+  params: {
+    name: bastionHostName
+    location: location
+    virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+    skuName: 'Developer'
+    tags: tags
+  }
+}
+
+// WebApp Outputs
+output WEBAPP_FOUNDRY_VTT_URL string = computeService == 'WebApp' ? webAppFoundryVtt.outputs.defaultHostname : ''
+output WEBAPP_DDBPROXY_URL string = computeService == 'WebApp' && deployDdbProxy ? webAppDdbProxy.outputs.defaultHostname : ''
+output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'WebApp' ? webAppFoundryVtt.outputs.resourceId : ''
+
+// Container Instance Outputs
+output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'ContainerInstance' ? containerGroup.outputs.iPv4Address : ''
+output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'ContainerInstance' ? containerGroup.outputs.resourceId : ''
+
+// Azure Container Apps Outputs
+// TBC
+
+// General Outputs
+output AZURE_ENV_NAME string = environmentName
+output AZURE_LOCATION string = location
+output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_PRINCIPAL_ID string = principalId
+output AZURE_PRINCIPAL_ID_TYPE string = principalIdType
+
+// Output the Bastion Host resources
+output AZURE_BASTION_HOST_DEPLOY bool = bastionHostDeploy
+output AZURE_BASTION_HOST_NAME string = bastionHostDeploy ? bastionHost.outputs.name : ''
+output AZURE_BASTION_HOST_RESOURCE_ID string = bastionHostDeploy ? bastionHost.outputs.resourceId : ''

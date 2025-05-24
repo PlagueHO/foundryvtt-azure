@@ -1,0 +1,78 @@
+name: test-infrastructure
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        description: "The environment to validate the application infrastructure for"
+        required: true
+        type: string
+      AZURE_LOCATION:
+        description: "The Azure region to deploy the application resources to"
+        required: true
+        type: string
+      AZURE_ENV_NAME:
+        description: "The name of the Azure environment"
+        required: true
+        type: string
+      AZURE_RESOURCE_GROUP:
+        description: "The name of the Azure resource group to deploy the application resources to"
+        required: false
+        type: string
+
+    secrets:
+      AZURE_TENANT_ID:
+        description: "The Azure tenant ID to use for authentication to Azure for deployment"
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        description: "The Azure subscription ID to use for authentication to Azure for deployment"
+        required: true
+      AZURE_CLIENT_ID:
+        description: "The Azure client ID to use for authentication to Azure for deployment"
+        required: true
+      FOUNDRY_USERNAME:
+        description: "The Foundry username to use to download the Foundry VTT licence"
+        required: true
+      FOUNDRY_PASSWORD:
+        description: "The Foundry password to use to download the Foundry VTT licence"
+        required: true
+      FOUNDRY_ADMIN_KEY:
+        description: "The Foundry admin key to use for authentication to Foundry"
+        required: true
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy ${{ inputs.ENVIRONMENT }} Infrastructure
+    env:
+      # Required for azd to authenticate with Azure using Federated Credentials
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Required for azd to provision the infrastructure
+      AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
+
+      # Optional azd parameters when using Federated Credentials
+      AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
+
+    environment: ${{ inputs.ENVIRONMENT }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2.1.0
+
+      - name: Authenticate azd (Federated Credentials)
+        run: |
+          azd auth login `
+            --client-id "$Env:AZURE_CLIENT_ID" `
+            --federated-credential-provider "github" `
+            --tenant-id "$Env:AZURE_TENANT_ID"
+        shell: pwsh
+
+      - name: Deploy solution
+        run: azd up --no-prompt
