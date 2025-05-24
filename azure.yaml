@@ -10,6 +10,8 @@ hooks:
     windows:
       run: |
         $url = azd env get-value FOUNDRY_VTT_URL
+        Write-Host ""
+        Write-Host "Deployment complete!"
         Write-Host "The URL for accessing your Foundry VTT deployment is: $url"
       shell: pwsh
       continueOnError: false
@@ -17,6 +19,8 @@ hooks:
     posix:
       run: |
         url=$(azd env get-value FOUNDRY_VTT_URL)
+        echo ""
+        echo "Deployment complete!"
         echo "The URL for accessing your Foundry VTT deployment is: $url"
       shell: sh
       continueOnError: false
