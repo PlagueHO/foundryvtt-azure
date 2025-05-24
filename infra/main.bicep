@@ -274,6 +274,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
     enableHierarchicalNamespace: false
     enableNfsV3: false
     enableSftp: false
+    requireInfrastructureEncryption: false
     fileServices: {
       shares: [
         {
