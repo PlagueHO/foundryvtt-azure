@@ -63,6 +63,9 @@ param storageConfiguration string = 'Premium_100GB'
 @sys.description('Enable public access to the Azure Storage Account. This is not recommended for production environments.')
 param storagePublicAccess bool = false
 
+@sys.description('Lock the storage account to prevent deletion. Must be removed before azd down.')
+param storageResourceLockEnabled bool = false
+
 // Compute Service configuration
 @sys.description('The compute service to use for deploying Foundry VTT.')
 @allowed([
@@ -378,6 +381,10 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
     sasExpirationPeriod: '180.00:00:00'
     skuName: storageConfigurationMap[storageConfiguration].sku
     tags: tags
+    lock: storageResourceLockEnabled ? {
+      kind: 'CanNotDelete'
+      name: '${storageAccountName}-delete-lock'
+    } : null
   }
 }
 

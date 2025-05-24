@@ -1,6 +1,7 @@
 # FoundryVTT Azure Solution Accelerator
 
 [![deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml/badge.svg)](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml)
+[![version][version-shield]][version-url]
 [![CD][cd-shield]][cd-url]
 [![License][license-shield]][license-url]
 [![Azure][azure-shield]][azure-url]
@@ -9,6 +10,11 @@
 Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (with a valid license) to Azure using the [Azure Developer CLI (azd)](https://aka.ms/install-azd) and Bicep.
 
 This solution accelerator provisions a secure, flexible, and updatable Foundry VTT environment in Azure, using best practices for security and well-architected Framework (WAF) where possible and sensible. Although WAF maybe considered overkill for a Foundry VTT deployment, it is included to demonstrate how to deploy a secure solution in Azure and most of it can be disabled using the configuration options if you prefer a simpler deployment.
+
+> [!IMPORTANT]
+> Due to the significant structural changes in v2.0.0, it is recommended to delete any previous deployments and start fresh with the latest version of this solution accelerator. This will ensure you have the most up-to-date features and configurations. You will need to take care to preserve any data you wish to keep, such as your Foundry VTT worlds, before deleting the existing deployment. You can back up your existing Foundry VTT data by copying the contents of the Azure Files share to a local machine or another storage account using tools like [Azure Storage Explorer](https://learn.microsoft.com/azure/storage/common/storage-explorer-install) or [AzCopy](https://learn.microsoft.com/azure/storage/common/storage-use-azcopy-v10). You can also deploy the new solution accelerator to a different resource group or Azure subscription and then copy the data across to the new deployment.
+>
+> If there is use for an upgrade guide to migrate existing deployments to the new structure, please open an issue on the [GitHub repository](https://github.com/PlagueHO/foundryvtt-azure/issues).
 
 ---
 
@@ -137,6 +143,7 @@ You can control deployment by setting environment variables before running `azd 
 - `DEPLOY_NETWORK`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
+- `AZURE_STORAGE_RESOURCE_LOCK_ENABLED`: `true` or `false` to apply a `CanNotDelete` lock on the storage account, preventing it from being deleted (e.g. via `azd down`) until the lock is removed. Default: `false`.
 - `AZURE_DEPLOYMENT_TYPE`: `WebApp` or `ContainerInstance`. Default is `WebApp`.
 - `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., `P1v2`). Default is `P0v3`.
 - `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance, from `1` to `4`. Default is `2`.
@@ -306,3 +313,6 @@ jobs:
 
 [iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
 [iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview
+
+[version-shield]: https://img.shields.io/badge/version-v2.0.0-blue
+[version-url]: https://github.com/PlagueHO/foundryvtt-azure/releases/tag/v2.0.0

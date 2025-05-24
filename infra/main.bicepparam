@@ -25,6 +25,9 @@ param storageConfiguration = readEnvironmentVariable('AZURE_STORAGE_CONFIGURATIO
 param storagePublicAccess = toLower(readEnvironmentVariable('AZURE_STORAGE_PUBLIC_ACCESS', 'false')) == 'true' ? true : false
 param computeService = readEnvironmentVariable('AZURE_COMPUTE_SERVICE', 'Web App')
 
+// Lock storage account to prevent accidental deletion
+param storageResourceLockEnabled = toLower(readEnvironmentVariable('AZURE_STORAGE_RESOURCE_LOCK_ENABLED', 'false')) == 'true' ? true : false
+
 // App Service Plan Parameters (required when ComputeService is set to Web App)
 param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SKUNAME', 'P0v3')
 
