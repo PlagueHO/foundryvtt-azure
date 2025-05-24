@@ -274,7 +274,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
     enableHierarchicalNamespace: false
     enableNfsV3: false
     enableSftp: false
-    requireInfrastructureEncryption: false
+    requireInfrastructureEncryption: true
     fileServices: {
       shares: [
         {
@@ -333,7 +333,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
       {
         name: 'azurestorageaccounts'
         properties: {
-          foundryvttdata: {
+          foundrydata: {
             accessKey: storageAccountReference.listKeys('2024-01-01').keys[0].value
             accountName: storageAccountName
             protocol: 'Smb'
