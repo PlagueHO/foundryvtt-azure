@@ -37,3 +37,6 @@ param deployDdbProxy = toLower(readEnvironmentVariable('AZURE_DEPLOY_DDB_PROXY',
 
 // Deploy a Bastion Host into the Virtual Network
 param bastionHostDeploy = toLower(readEnvironmentVariable('AZURE_BASTION_HOST_DEPLOY', 'false')) == 'true' ? true : false
+
+// Deploy Log Analytics and Diagnostics
+param deployDiagnostics = toLower(readEnvironmentVariable('AZURE_DEPLOY_DIAGNOSTICS', 'false')) == 'true' ? true : false

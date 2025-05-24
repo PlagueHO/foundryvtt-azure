@@ -115,6 +115,9 @@ param deployDdbProxy bool = false
 @sys.description('Deploy a Bastion host into the VNET.')
 param bastionHostDeploy bool = false
 
+@sys.description('Deploy Azure Log Analytics and configure diagnostics for resources. Default is false.')
+param deployDiagnostics bool = false
+
 // tags that should be applied to all resources.
 var tags = {
   'azd-env-name': environmentName
@@ -131,12 +134,34 @@ var webAppFoundryVttName string = environmentName
 var webAppDdbProxyName string = '${environmentName}ddbproxy'
 var containerInstanceFoundryVttName string = '${abbrs.containerInstanceContainerGroups}${environmentName}'
 var bastionHostName string = '${abbrs.networkBastionHosts}${environmentName}'
+var keyVaultPrivateDnsZoneName = 'privatelink.vaultcore.azure.net'
+var logAnalyticsWorkspaceName = take('${abbrs.operationalInsightsWorkspaces}${environmentName}', 63)
+
+// Key Vault Configuration
+@sys.description('Name for the Key Vault. Must be globally unique, 3-24 alphanumeric characters, no hyphens.')
+var keyVaultName = take('kv${replace(environmentName, '-', '')}', 24)
+var storageAccountKeySecretName = 'storageAccountKey'
 
 // Docker image names and tags
 var foundryVttDockerImageName string = 'felddy/foundryvtt'
 var foundryVttDockerImageTag string = 'release'
 var ddbProxyDockerImageName string = 'ghcr.io/mrprimate/ddb-proxy'
 var ddbProxyDockerImageTag string = 'latest'
+
+// Log Analytics configuration
+var sendToLogAnalyticsName = 'send-to-loganalytics-${environmentName}'
+var sendToLogAnalytics = deployDiagnostics ? [
+  {
+    name: sendToLogAnalyticsName
+    workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    logCategoriesAndGroups: [
+      {
+        categoryGroup: 'allLogs'
+      }
+    ]
+    metricCategories: []
+  }
+] : []
 
 var effectiveDeployNetworking = deployNetworking && computeService == 'Web App' // Only deploy networking if using Web App
 
@@ -146,6 +171,18 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
   tags: tags
 }
+
+// ------------- LOG ANALYTICS WORKSPACE (OPTIONAL) -------------
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.2' = if (deployDiagnostics) {
+  name: 'log-analytics-workspace-deployment'
+  scope: rg
+  params: {
+    name: logAnalyticsWorkspaceName
+    location: location
+    tags: tags
+  }
+}
+
 
 // ---------- NETWORKING ----------
 var subnets = [
@@ -159,19 +196,26 @@ var subnets = [
     name: 'storage'
     addressPrefix: '10.0.1.0/24'
     privateEndpointNetworkPolicies: 'Disabled'
-    networkSecurityGroupResourceId: networkSecurityGroupStorage.outputs.resourceId
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupStorage.outputs.resourceId : null
+  }
+  {
+    // Key Vault Subnet (Key Vault private endpoints)
+    name: 'keyVault'
+    addressPrefix: '10.0.2.0/24'
+    privateEndpointNetworkPolicies: 'Disabled'
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupKeyVault.outputs.resourceId : null
   }
   {
     // Web App Subnet (App Service private endpoints)
-    // Only used when deploying into an Azure Web App
+    // Only used when deploying into an Azure Web App with networking
     name: 'webApp'
-    addressPrefix: '10.0.2.0/24'
+    addressPrefix: '10.0.3.0/24'
     delegation: 'Microsoft.Web/serverFarms'
-    networkSecurityGroupResourceId: networkSecurityGroupWebApp.outputs.resourceId
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupWebApp.outputs.resourceId : null
   }
   {
     // Azure Bastion Subnet (Bastion Host)
-    // Only used when deploying an Azure Bastion Host
+    // Only used when deploying an Azure Bastion Host with networking
     name: 'AzureBastionSubnet'
     addressPrefix: '10.0.10.0/27'
   }
@@ -199,6 +243,17 @@ module networkSecurityGroupStorage 'br/public:avm/res/network/network-security-g
   }
 }
 
+module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-group:0.5.1' = if (effectiveDeployNetworking) {
+  name: 'network-security-group-keyvault-deployment'
+  scope: rg
+  params: {
+    name: take('${abbrs.networkNetworkSecurityGroups}${environmentName}-keyvault', 60)
+    location: location
+    securityRules: []
+    tags: tags
+  }
+}
+
 module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
   scope: rg
@@ -220,6 +275,28 @@ module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7
   params: {
     name: 'privatelink.file.${environment().suffixes.storage}'
     location: 'global'
+    virtualNetworkLinks: [
+      {
+        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+        registrationEnabled: false
+      }
+    ]
+    tags: tags
+  }
+}
+
+module keyVaultPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (effectiveDeployNetworking) {
+  name: 'keyvault-private-dns-zone'
+  scope: rg
+  params: {
+    name: keyVaultPrivateDnsZoneName
+    location: 'global'
+    virtualNetworkLinks: [
+      {
+        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+        registrationEnabled: false
+      }
+    ]
     tags: tags
   }
 }
@@ -254,8 +331,10 @@ var endpoints = effectiveDeployNetworking ? [
 var privateEndpoints = effectiveDeployNetworking ? [
   {
     privateDnsZoneGroup: {
+      name: 'default' // Name for the Private DNS Zone Group
       privateDnsZoneGroupConfigs: [
         {
+          name: 'storagefiledns' // Name for this specific DNS zone config
           privateDnsZoneResourceId: storageFilePrivateDnsZone.outputs.resourceId
         }
       ]
@@ -271,6 +350,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
   scope: rg
   params: {
     name: storageAccountName
+    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
     enableHierarchicalNamespace: false
     enableNfsV3: false
     enableSftp: false
@@ -299,13 +379,75 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
   }
 }
 
-// This is required to reference the storage account keys in the Web App
+// This is required to reference to allow the Key Vault to get the storage account key
 resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: storageAccountName
   scope: rg
   dependsOn: [
     storageAccount
   ]
+}
+
+// ------------- KEY VAULT -------------
+module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
+  name: 'key-vault-deployment'
+  scope: rg
+  dependsOn: [
+    storageAccountReference // Ensure storage account is provisioned before trying to get its key
+  ]
+  params: {
+    name: keyVaultName
+    location: location
+    tags: tags
+    sku: 'standard'
+    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
+    enablePurgeProtection: false
+    enableRbacAuthorization: true
+    secrets: [
+      {
+        name: storageAccountKeySecretName
+        value: storageAccountReference.listKeys('2024-01-01').keys[0].value // Just store the key, not the full connection string
+        // Store the full connection string instead of just the key
+        // value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccountReference.listKeys('2024-01-01').keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+      }
+    ]
+    networkAcls: { // Restrict public access if VNet deployed, otherwise allow (as PEs won't exist)
+      defaultAction: effectiveDeployNetworking ? 'Deny' : 'Allow'
+      bypass: 'AzureServices'
+    }
+    privateEndpoints: effectiveDeployNetworking ? [
+      {
+        subnetResourceId: virtualNetwork.outputs.subnetResourceIds[2] // Key Vault Subnet
+        service: 'vault' // Sub-resource for Key Vault
+        privateDnsZoneGroup: {
+          name: 'default' // Name for the Private DNS Zone Group
+          privateDnsZoneGroupConfigs: [
+            {
+              name: 'keyvaultdns' // Name for this specific DNS zone config
+              privateDnsZoneResourceId: keyVaultPrivateDnsZone.outputs.resourceId
+            }
+          ]
+        }
+        tags: tags
+      }
+    ] : []
+    roleAssignments: concat(
+      [
+        {
+          roleDefinitionIdOrName: 'Key Vault Secrets Officer'
+          principalId: principalId
+          principalType: principalIdType
+        }
+      ],
+      (computeService == 'Web App' ? [
+        {
+          roleDefinitionIdOrName: 'Key Vault Secrets User'
+          principalId: webAppFoundryVtt.outputs.?systemAssignedMIPrincipalId // Removed '?' as identity is always enabled for WebApp
+          principalType: 'ServicePrincipal'
+        }
+      ] : [])
+    )
+  }
 }
 
 // ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEB APP) -------------
@@ -320,6 +462,8 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeServ
     skuName: appServicePlanSkuName
     tags: tags
     zoneRedundant: false
+    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
+
   }
 }
 
@@ -334,7 +478,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
         name: 'azurestorageaccounts'
         properties: {
           foundrydata: {
-            accessKey: storageAccountReference.listKeys('2024-01-01').keys[0].value
+            accessKey: '@AppSettingRef(STORAGE_ACCOUNT_KEY)'
             accountName: storageAccountName
             protocol: 'Smb'
             mountPath: '/data'
@@ -344,6 +488,9 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
         }
       }
     ]
+    managedIdentities: {
+      systemAssigned: true
+    }
     serverFarmResourceId: appServicePlan.outputs.resourceId
     siteConfig: {
       alwaysOn: true
@@ -376,22 +523,24 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
           name: 'FOUNDRY_MINIFY_STATIC_FILES'
           value: 'true'
         }
-        // Set the container start time limit to max because Foundry VTT
-        // container may take some time to start up depending on the number
-        // of modules added.
         {
           name: 'WEBSITES_CONTAINER_START_TIME_LIMIT'
           value: '1800'
         }
         {
           name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
-          value: 'false'
+          value: 'false' // Important: Disables default storage, we provide our own via Azure Files
         }
         {
           name: 'WEBSITES_PORT'
           value: '30000'
         }
+        {
+          name: 'STORAGE_ACCOUNT_KEY'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${storageAccountKeySecretName})'
+        }
       ]
+      vnetRouteAllEnabled: effectiveDeployNetworking // Route all traffic through VNet if integrated, for KV access
       detailedErrorLoggingEnabled: true
       ftpsState: 'FtpsOnly'
       httpLoggingEnabled: true
@@ -401,7 +550,23 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
       numberOfWorkers: 1
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // Web App Subnet
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
+    diagnosticSettings: deployDiagnostics ? [
+      {
+        name: sendToLogAnalyticsName
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        logCategoriesAndGroups: [
+          // Common App Service log categories
+          { category: 'AppServiceHTTPLogs' }
+          { category: 'AppServiceConsoleLogs' }
+          { category: 'AppServiceAppLogs' }
+          { category: 'AppServiceAuditLogs' }
+          { category: 'AppServiceIPSecAuditLogs' }
+          { category: 'AppServicePlatformLogs' }
+        ]
+        metricCategories: []
+      }
+    ] : []
   }
 }
 
@@ -409,6 +574,21 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService =
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {
+    diagnosticSettings: deployDiagnostics ? [
+      {
+        name: sendToLogAnalyticsName
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        logCategoriesAndGroups: [
+          { category: 'AppServiceHTTPLogs' }
+          { category: 'AppServiceConsoleLogs' }
+          { category: 'AppServiceAppLogs' }
+          { category: 'AppServiceAuditLogs' }
+          { category: 'AppServiceIPSecAuditLogs' }
+          { category: 'AppServicePlatformLogs' }
+        ]
+        metricCategories: []
+      }
+    ] : []
     kind: 'app,linux,container'
     name: webAppDdbProxyName
     serverFarmResourceId: appServicePlan.outputs.resourceId
@@ -439,11 +619,12 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService =
       healthCheckPath: '/ping' // Added health check path
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // Web App Subnet
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
   }
 }
 
 // ------------- CONTAINER INSTANCE (IF COMPUTE SERVICE IS CONTAINER INSTANCE) -------------
+// TODO: AVM module doesn't currently support diagnostics
 module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.0' = if (computeService == 'Container Instance') {
   name: 'foundry-vtt-container-group-deployment'
   scope: rg
@@ -518,19 +699,28 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
 
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
-// ------------- CONTAINER APPS (IF COMPUTE SERVICE IS CONTAINER APPS) -------------
-// TBC
-
 // ------------- BASTION HOST (OPTIONAL) -------------
-module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (bastionHostDeploy) {
+module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (effectiveDeployNetworking && bastionHostDeploy) {
   name: 'bastion-host-deployment'
   scope: rg
   params: {
     name: bastionHostName
     location: location
     virtualNetworkResourceId: virtualNetwork.outputs.resourceId
-    skuName: 'Developer'
+    skuName: 'Developer' // Consider making this configurable or choosing based on needs
     tags: tags
+    diagnosticSettings: deployDiagnostics ? [
+      {
+        name: sendToLogAnalyticsName
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        logCategoriesAndGroups: [
+          {
+            category: 'BastionAuditLogs'
+          }
+        ]
+        metricCategories: []
+      }
+    ] : []
   }
 }
 
@@ -553,7 +743,11 @@ output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_PRINCIPAL_ID string = principalId
 output AZURE_PRINCIPAL_ID_TYPE string = principalIdType
 
-// Output the Bastion Host resources
-output AZURE_BASTION_HOST_DEPLOY bool = bastionHostDeploy
-output AZURE_BASTION_HOST_NAME string = bastionHostDeploy ? bastionHost.outputs.name : ''
-output AZURE_BASTION_HOST_RESOURCE_ID string = bastionHostDeploy ? bastionHost.outputs.resourceId : ''
+// Key Vault Outputs
+output KEY_VAULT_NAME string = keyVault.outputs.name
+output KEY_VAULT_URI string = keyVault.outputs.uri
+output KEY_VAULT_RESOURCE_ID string = keyVault.outputs.resourceId
+
+// Log Analytics Outputs
+output LOG_ANALYTICS_WORKSPACE_NAME string = deployDiagnostics ? logAnalyticsWorkspace.outputs.name : ''
+output LOG_ANALYTICS_WORKSPACE_RESOURCE_ID string = deployDiagnostics ? logAnalyticsWorkspace.outputs.resourceId : ''

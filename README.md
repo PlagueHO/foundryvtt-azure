@@ -8,7 +8,7 @@
 
 Deploy your own [Foundry Virtual Table Top](https://foundryvtt.com/) server (with a valid license) to Azure using the [Azure Developer CLI (azd)](https://aka.ms/install-azd) and Bicep.
 
-This solution accelerator provisions a secure, flexible, and updatable Foundry VTT environment in Azure, using best practices for resource isolation, managed identities, and persistent storage.
+This solution accelerator provisions a secure, flexible, and updatable Foundry VTT environment in Azure, using best practices for security and well-architected Framework (WAF) where possible and sensible. Although WAF maybe considered overkill for a Foundry VTT deployment, it is included to demonstrate how to deploy a secure solution in Azure and most of it can be disabled using the configuration options if you prefer a simpler deployment.
 
 ---
 
@@ -26,12 +26,13 @@ Before you begin, ensure you have:
 ## Key Features
 
 - **Zero-trust**: Deploys resources into a virtual network with private endpoints and disables public access by default.
-- **Managed identities**: Uses managed identities for secure resource authentication.
 - **Azure Verified Modules**: Leverages [Azure Verified Modules](https://aka.ms/avm) for infrastructure.
-- **Flexible compute**: Supports Azure Web App (Linux container) or Azure Container Instance.
+- **Flexible compute**: Supports Azure Web App (Linux container), Azure Container Instance (lightweight), or future Azure Container Apps.
 - **Persistent storage**: Uses Azure Files for Foundry VTT data.
+- **Key Vault**: Uses Azure Key Vault to store storage account keys (and soon Foundry secrets).
 - **Optional DDB-Proxy**: Deploy [DDB-Proxy](https://github.com/MrPrimate/ddb-proxy) for [DDB-Importer](https://github.com/MrPrimate/ddb-importer) plugin support.
 - **Optional Bastion Host**: Deploy Azure Bastion for secure access.
+- **Optional Diagnostics**: Deploy Azure Log Analytics and configure resource diagnostics.
 
 ---
 
@@ -106,6 +107,7 @@ azd env set AZURE_CONTAINER_INSTANCE_CPU "2"
 azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2"
 azd env set AZURE_DEPLOY_DDB_PROXY "false"
 azd env set AZURE_BASTION_HOST_DEPLOY "false"
+azd env set AZURE_DEPLOY_DIAGNOSTICS "false"
 ```
 
 > See [Configuration Options](#configuration-options) for all available variables.
@@ -141,6 +143,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy.
 - `AZURE_BASTION_HOST_DEPLOY`: `true` or `false` to deploy Azure Bastion.
 - `AZURE_COMPUTE_SERVICE`: `WebApp` or `ContainerInstance` (controls the compute service used for Foundry VTT).
+- `AZURE_DEPLOY_DIAGNOSTICS`: `true` or `false` to deploy a Log Analytics workspace and send resource diagnostics to it. Default is `false`.
 
 For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
@@ -154,6 +157,7 @@ After deployment, `azd up` will output resource URLs and connection info, includ
 - DDB-Proxy URL (if enabled)
 - Resource group name
 - Bastion Host info (if enabled)
+- Log Analytics Workspace info (if enabled)
 
 ---
 
@@ -175,6 +179,7 @@ The solution deploys:
 - Azure Web App (Linux container) or Azure Container Instance
 - (Optional) DDB-Proxy container
 - (Optional) Azure Bastion
+- (Optional) Azure Log Analytics Workspace (if `AZURE_DEPLOY_DIAGNOSTICS` is `true`)
 
 ---
 
@@ -283,9 +288,7 @@ jobs:
           azd env set FOUNDRY_PASSWORD "${{ secrets.FOUNDRY_PASSWORD }}"
           azd env set FOUNDRY_ADMIN_KEY "${{ secrets.FOUNDRY_ADMIN_KEY }}"
           # Set other variables as needed
-
-      - name: Deploy Foundry VTT
-        run: azd up --no-prompt
+          azd env set AZURE_DEPLOY_DIAGNOSTICS "true" # Example: enable diagnostics in CI
 ```
 
 ---
@@ -300,7 +303,5 @@ jobs:
 [azure-shield]: https://img.shields.io/badge/Azure-Solution%20Accelerator-0078D4?logo=microsoftazure&logoColor=white
 [azure-url]: https://azure.microsoft.com/
 
-[iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
-[iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview
 [iac-shield]: https://img.shields.io/badge/Infrastructure%20as%20Code-Bicep-5C2D91?logo=azurepipelines&logoColor=white
 [iac-url]: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview
