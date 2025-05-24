@@ -422,7 +422,7 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
   params: {
     name: containerInstanceFoundryVttName
     location: location
-    availabilityZone: 1
+    availabilityZone: -1
     containers: [
       {
         name: 'foundryvtt'
