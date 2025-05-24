@@ -17,6 +17,9 @@ param foundryAdminKey = readEnvironmentVariable('FOUNDRY_ADMIN_KEY', '')
 // Network Isolation
 param deployNetworking = toLower(readEnvironmentVariable('DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
 
+// Deploy Log Analytics and Diagnostics
+param deployDiagnostics = toLower(readEnvironmentVariable('AZURE_DEPLOY_DIAGNOSTICS', 'false')) == 'true' ? true : false
+
 // Optional parameters
 param storageConfiguration = readEnvironmentVariable('AZURE_STORAGE_CONFIGURATION', 'Premium_100GB')
 param storagePublicAccess = toLower(readEnvironmentVariable('AZURE_STORAGE_PUBLIC_ACCESS', 'false')) == 'true' ? true : false
@@ -37,6 +40,3 @@ param deployDdbProxy = toLower(readEnvironmentVariable('AZURE_DEPLOY_DDB_PROXY',
 
 // Deploy a Bastion Host into the Virtual Network
 param bastionHostDeploy = toLower(readEnvironmentVariable('AZURE_BASTION_HOST_DEPLOY', 'false')) == 'true' ? true : false
-
-// Deploy Log Analytics and Diagnostics
-param deployDiagnostics = toLower(readEnvironmentVariable('AZURE_DEPLOY_DIAGNOSTICS', 'false')) == 'true' ? true : false

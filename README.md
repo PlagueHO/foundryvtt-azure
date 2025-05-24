@@ -52,8 +52,8 @@ azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 
 ### Feature Comparison
 
-| Feature                        | Web App (Default)                     | Container Instance                             | Container Apps (Future)     |
-| ------------------------------ | --------------------------------------| ---------------------------------------------- | --------------------------- |
+| Feature                        | Web App (Default, Recommended)        | Container Instance                             | Container Apps (Future)     |
+| ------------------------------ | ------------------------------------- | ---------------------------------------------- | --------------------------- |
 | **Description**                | Azure App Service                     | Azure Container Instance                       | Azure Container Apps        |
 | **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`                    | `felddy/foundryvtt:release` |  
 | **Persistent Data**            | Azure Files                           | Azure Files                                    | Azure Files                 |
@@ -63,6 +63,7 @@ azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 | **Virtual Network Deployment** | Yes (default, enhances security)      | No                                             | TBC                         |
 | **Current Status**             | Operational                           | Limited                                        | TBC                         |
 | **URL**                        | https://<env>.azurewebsites.net       | http://<env>.<region>.azurecontainer.io:30000/ | TBC                         |
+| **Secrets Stored**             | Azure Key Vault                       | In service                                     | TBC                         |
 
 > [!NOTE]
 > The ContainerApps option is not currently available, but should be added in the future. If you are interested in this option, please open an issue on the [GitHub repository](https://github.com/PlagueHO/foundryvtt-azure/issues).

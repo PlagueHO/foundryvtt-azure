@@ -138,9 +138,11 @@ var keyVaultPrivateDnsZoneName = 'privatelink.vaultcore.azure.net'
 var logAnalyticsWorkspaceName = take('${abbrs.operationalInsightsWorkspaces}${environmentName}', 63)
 
 // Key Vault Configuration
-@sys.description('Name for the Key Vault. Must be globally unique, 3-24 alphanumeric characters, no hyphens.')
 var keyVaultName = take('kv${replace(environmentName, '-', '')}', 24)
 var storageAccountKeySecretName = 'storageAccountKey'
+var foundryUsernameSecretName   = 'foundryUsername'
+var foundryPasswordSecretName   = 'foundryPassword'
+var foundryAdminKeySecretName   = 'foundryAdminKey'
 
 // Docker image names and tags
 var foundryVttDockerImageName string = 'felddy/foundryvtt'
@@ -393,7 +395,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
   name: 'key-vault-deployment'
   scope: rg
   dependsOn: [
-    storageAccountReference // Ensure storage account is provisioned before trying to get its key
+    storageAccountReference
   ]
   params: {
     name: keyVaultName
@@ -406,9 +408,19 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
     secrets: [
       {
         name: storageAccountKeySecretName
-        value: storageAccountReference.listKeys('2024-01-01').keys[0].value // Just store the key, not the full connection string
-        // Store the full connection string instead of just the key
-        // value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccountReference.listKeys('2024-01-01').keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+        value: storageAccountReference.listKeys('2024-01-01').keys[0].value
+      }
+      {
+        name: foundryUsernameSecretName
+        value: foundryUsername
+      }
+      {
+        name: foundryPasswordSecretName
+        value: foundryPassword
+      }
+      {
+        name: foundryAdminKeySecretName
+        value: foundryAdminKey
       }
     ]
     networkAcls: { // Restrict public access if VNet deployed, otherwise allow (as PEs won't exist)
@@ -509,15 +521,15 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
         }
         {
           name: 'FOUNDRY_USERNAME'
-          value: foundryUsername
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${foundryUsernameSecretName})'
         }
         {
           name: 'FOUNDRY_PASSWORD'
-          value: foundryPassword
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${foundryPasswordSecretName})'
         }
         {
           name: 'FOUNDRY_ADMIN_KEY'
-          value: foundryAdminKey
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${foundryAdminKeySecretName})'
         }
         {
           name: 'FOUNDRY_MINIFY_STATIC_FILES'
