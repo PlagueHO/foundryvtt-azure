@@ -155,23 +155,19 @@ var subnets = [
     addressPrefix: '10.0.0.0/24'
   }
   {
-    // storagePrivateEndpoint Subnet (Storage Account private endpoints)
-    name: 'storagePrivateEndpoint'
+    // Storage Subnet (Storage Account private endpoints)
+    name: 'storage'
     addressPrefix: '10.0.1.0/24'
     privateEndpointNetworkPolicies: 'Disabled'
+    networkSecurityGroupResourceId: networkSecurityGroupStorage.outputs.resourceId
   }
   {
-    // webApp Integration Subnet (App Service private endpoints)
-    // Only used when deploying into an Azure Container Web App
-    name: 'webAppIntegration'
+    // Web App Subnet (App Service private endpoints)
+    // Only used when deploying into an Azure Web App
+    name: 'webApp'
     addressPrefix: '10.0.2.0/24'
     delegation: 'Microsoft.Web/serverFarms'
-  }
-  {
-    // Container Registry Subnet (ACR private endpoints)
-    // Only used when deploying into an Azure Container Instance
-    name: 'containerGroupSubnet'
-    addressPrefix: '10.0.3.0/24'
+    networkSecurityGroupResourceId: networkSecurityGroupWebApp.outputs.resourceId
   }
   {
     // Azure Bastion Subnet (Bastion Host)
@@ -180,6 +176,28 @@ var subnets = [
     addressPrefix: '10.0.10.0/27'
   }
 ]
+
+module networkSecurityGroupWebApp 'br/public:avm/res/network/network-security-group:0.5.1' = if (effectiveDeployNetworking) {
+  name: 'network-security-group-web-app-deployment'
+  scope: rg
+  params: {
+    name: take('${abbrs.networkNetworkSecurityGroups}${environmentName}-webApp' ,60)
+    location: location
+    securityRules: []
+    tags: tags
+  }
+}
+
+module networkSecurityGroupStorage 'br/public:avm/res/network/network-security-group:0.5.1' = if (effectiveDeployNetworking) {
+  name: 'network-security-group-storage-deployment'
+  scope: rg
+  params: {
+    name: take('${abbrs.networkNetworkSecurityGroups}${environmentName}-storage' ,60)
+    location: location
+    securityRules: []
+    tags: tags
+  }
+}
 
 module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
@@ -243,7 +261,7 @@ var privateEndpoints = effectiveDeployNetworking ? [
       ]
     }
     service: 'file'
-    subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // storagePrivateEndpoint
+    subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // Storage Subnet
     tags: tags
   }
 ] : []
@@ -280,6 +298,15 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
   }
 }
 
+// This is required to reference the storage account keys in the Web App
+resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: storageAccountName
+  scope: rg
+  dependsOn: [
+    storageAccount
+  ]
+}
+
 // ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEB APP) -------------
 module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeService == 'Web App') {
   name: 'app-service-plan-deployment'
@@ -306,7 +333,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
         name: 'azurestorageaccounts'
         properties: {
           foundryvttdata: {
-            accessKey: listkeys(resourceId(subscription().subscriptionId , resourceGroupName, 'Microsoft.Storage/storageAccounts', storageAccountName), '2024-01-01').keys[0].value
+            accessKey: storageAccountReference.listKeys('2024-01-01').keys[0].value
             accountName: storageAccountName
             protocol: 'Smb'
             mountPath: '/data'
@@ -373,7 +400,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
       numberOfWorkers: 1
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // webAppIntegration
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // Web App Subnet
   }
 }
 
@@ -411,7 +438,7 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService =
       healthCheckPath: '/ping' // Added health check path
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // webAppIntegration
+    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[2] : null // Web App Subnet
   }
 }
 
@@ -481,7 +508,7 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
         azureFile: {
           shareName: 'foundryvttdata'
           storageAccountName: storageAccountName
-          storageAccountKey: listkeys(resourceId(subscription().subscriptionId , resourceGroupName, 'Microsoft.Storage/storageAccounts', storageAccountName), '2024-01-01').keys[0].value
+          storageAccountKey: storageAccountReference.listKeys('2024-01-01').keys[0].value
         }
       }
     ]

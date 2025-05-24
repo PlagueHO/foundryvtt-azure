@@ -51,16 +51,17 @@ azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 
 ### Feature Comparison
 
-| Feature                        | Web App (Default)                     | Container Instance               | Container Apps (Future)     |
-| ------------------------------ | --------------------------------------| -------------------------------- | --------------------------- |
-| **Description**                | Azure App Service                     | Azure Container Instance         | Azure Container Apps        |
-| **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`      | `felddy/foundryvtt:release` |  
-| **Persistent Data**            | Azure Files                           | Azure Files                      | Azure Files                 |
-| **Storage Account Access**     | Private VNET, Public Optional         | Public Only                      | TBC                         |
-| **DDB-Proxy Support**          | Yes (optional)                        | No                               | TBC                         |
-| **DDB-Proxy Docker Image**     | `ghcr.io/mrprimate/ddb-proxy:release` | N/A                              | TBC                         |
-| **Virtual Network Deployment** | Yes (default, enhances security)      | No                               | TBC                         |
-| **Current Status**             | Operational                           | Limited                          | TBC                         |
+| Feature                        | Web App (Default)                     | Container Instance                             | Container Apps (Future)     |
+| ------------------------------ | --------------------------------------| ---------------------------------------------- | --------------------------- |
+| **Description**                | Azure App Service                     | Azure Container Instance                       | Azure Container Apps        |
+| **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`                    | `felddy/foundryvtt:release` |  
+| **Persistent Data**            | Azure Files                           | Azure Files                                    | Azure Files                 |
+| **Storage Account Access**     | Private VNET, Public Optional         | Public Only                                    | TBC                         |
+| **DDB-Proxy Support**          | Yes (optional)                        | No                                             | TBC                         |
+| **DDB-Proxy Docker Image**     | `ghcr.io/mrprimate/ddb-proxy:release` | N/A                                            | TBC                         |
+| **Virtual Network Deployment** | Yes (default, enhances security)      | No                                             | TBC                         |
+| **Current Status**             | Operational                           | Limited                                        | TBC                         |
+| **URL**                        | https://<env>.azurewebsites.net       | http://<env>.<region>.azurecontainer.io:30000/ | TBC                         |
 
 > [!NOTE]
 > The ContainerApps option is not currently available, but should be added in the future. If you are interested in this option, please open an issue on the [GitHub repository](https://github.com/PlagueHO/foundryvtt-azure/issues).
