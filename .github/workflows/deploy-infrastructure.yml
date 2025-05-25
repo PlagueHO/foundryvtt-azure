@@ -56,6 +56,11 @@ jobs:
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
 
+      # Foundry secrets as environment variables
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
     environment: ${{ inputs.ENVIRONMENT }}
     runs-on: ubuntu-latest
 
