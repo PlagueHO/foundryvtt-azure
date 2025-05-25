@@ -376,7 +376,6 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
     }
     privateEndpoints: privateEndpoints
     publicNetworkAccess: storagePublicAccess || ! effectiveDeployNetworking ? 'Enabled' : 'Disabled'
-    requireInfrastructureEncryption: false
     sasExpirationPeriod: '180.00:00:00'
     skuName: storageConfigurationMap[storageConfiguration].sku
     tags: tags
