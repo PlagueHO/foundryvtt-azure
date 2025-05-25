@@ -3,6 +3,15 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-05-24
+
+### Changed
+
+- Updated the Bicep deployment to use Azure Verified Modules [https://aka.ms/avm](https://aka.ms/avm).
+- Added support for deployment via Azure Developer CLI (azd).
+- Converted GitHub Actions workflow to use Azure Developer CLI (azd) to
+  deploy the Bicep template.
+
 ## [0.6.0] - 2025-02-15
 
 ### Changed

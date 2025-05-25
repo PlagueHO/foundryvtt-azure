@@ -1,0 +1,30 @@
+name: deploy-production
+
+on:
+  # This workflow is only triggered manually and on a schedule as it deploys to production.
+  workflow_dispatch:
+  schedule:
+    - cron: '0 14 * * *' # 2am NZT (UTC+12)
+    
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-infrastructure:
+    # Ensure this only runs on the main branch
+    if: github.ref == 'refs/heads/main'
+    name: Deploy Infrastructure
+    uses: ./.github/workflows/deploy-infrastructure.yml
+    with:
+      ENVIRONMENT: Production
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}  

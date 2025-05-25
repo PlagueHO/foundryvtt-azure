@@ -1,0 +1,59 @@
+name: continuous-testing
+# Because this workflow only performs testing, and not deployment, it is called continuous-testing.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  workflow_dispatch:
+  
+permissions:
+  id-token: write
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  lint-and-publish-bicep:
+    uses: ./.github/workflows/lint-and-publish-bicep.yml
+
+  # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
+  test-webapp:
+    name: Test WebApp Deployment
+    uses: ./.github/workflows/test-infrastructure.yml
+    with:
+      ENVIRONMENT: WebApp
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_ENV_NAME: ${{ format('fvtt-webapp-{1}-{2}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP: ${{ format('fvtt-webapp-{1}-{2}-rg', github.ref_name, github.run_id) }}
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+  # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
+  test-container-instance:
+    name: Test Container Instance Deployment
+    uses: ./.github/workflows/test-infrastructure.yml
+    needs:
+      - test-webapp
+    with:
+      ENVIRONMENT: ContainerInstance
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_ENV_NAME: ${{ format('fvtt-aci-{1}-{2}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP: ${{ format('fvtt-aci-{1}-{2}-rg', github.ref_name, github.run_id) }}
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+      
+
+    

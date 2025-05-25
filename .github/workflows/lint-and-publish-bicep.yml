@@ -1,0 +1,27 @@
+name: lint-and-publish-bicep
+
+on:
+  workflow_call:
+
+jobs:
+  lint-and-publish-bicep:
+    name: Lint and Publish Bicep
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Lint Bicep
+      run: |
+        bicep lint ./infra/main.bicep
+
+    - name: Publish Bicep as Workflow Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: infrastructure_bicep
+        path: |
+           ./infra/*.bicep
+           ./infra/*.json
+           ./infra/core/
+           ./infra/types/

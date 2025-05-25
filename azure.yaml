@@ -4,3 +4,24 @@ name: foundryvtt-azure
 metadata:
   template: foundryvtt-azure@1.0
   name: foundryvtt-azure@1.0
+
+hooks:
+  postprovision:
+    windows:
+      run: |
+        $url = azd env get-value FOUNDRY_VTT_URL
+        Write-Host ""
+        Write-Host "Deployment complete!"
+        Write-Host "The URL for accessing your Foundry VTT deployment is: $url"
+      shell: pwsh
+      continueOnError: false
+      interactive: true
+    posix:
+      run: |
+        url=$(azd env get-value FOUNDRY_VTT_URL)
+        echo ""
+        echo "Deployment complete!"
+        echo "The URL for accessing your Foundry VTT deployment is: $url"
+      shell: sh
+      continueOnError: false
+      interactive: true
