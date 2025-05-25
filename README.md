@@ -161,7 +161,12 @@ For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
 After deployment, `azd up` will output the URL to your Foundry VTT server:
 
+```plaintext
+Deployment complete!
+The URL for accessing your Foundry VTT deployment is: https://<environment_name>.azurewebsites.net/
+```
 
+![Completed Deployment](/docs/images/deployment-complete.png)
 
 ---
 
@@ -192,16 +197,23 @@ For more information on how to use the DDB-Proxy with Foundry VTT, please see th
 
 ## Architecture
 
-The solution deploys:
+The following table summarizes which Azure resources are deployed for each compute service option:
 
-- **Azure Resource Group** to contain all resources
-- **Virtual Network** with subnets for storage, web app, container group, and Bastion (optional)
-- **Azure Storage Account** using Azure Files to store Foundry VTT data
-- **Azure Key Vault** for storage account keys and Foundry VTT secrets
-- **Azure Web App** or **Azure Container Instance** for Foundry VTT hosting
-- **Azure Web App** for hosting DDB-Proxy (optional)
-- **Azure Bastion** for secure access to private resources if using a Virtual Network (optional)
-- **Azure Log Analytics Workspace** for diagnostics and monitoring (optional)
+| Resource                                             | Web App (Default, Recommended) | Container Instance           |
+|------------------------------------------------------|--------------------------------|------------------------------|
+| **Azure Resource Group**                             | ✔️                             | ✔️                          |
+| **Virtual Network**                                  | ✔️ (default)                   | Not supported                |
+| **Azure Storage Account (Azure Files)**              | ✔️                             | ✔️                          |
+| **Azure Key Vault**                                  | ✔️                             | ✔️ (not used)               |
+| **Azure Web App (Foundry VTT container)**            | ✔️                             | N/A                          |
+| **Azure Web App (DDB-Proxy)**                        | ✔️ (optional)                  | N/A                          |
+| **Azure Container Instance (Foundry VTT container)** | N/A                            | ✔️                           |
+| **Azure Container Instance (DDB-Proxy)**             | N/A                            | Not supported                |
+| **Azure Bastion**                                    | Optional                       | Not supported                |
+| **Azure Log Analytics Workspace**                    | Optional                       | Optional                     |
+
+> [!NOTE]
+> [Soft-delete](https://learn.microsoft.com/azure/key-vault/general/soft-delete-overview) is not enabled for the Key Vault by default as it doesn't contain any secrets that can't be easily recreated by redeploying the solution.
 
 ---
 
@@ -213,11 +225,20 @@ To delete all resources created by this deployment:
 azd down
 ```
 
+> [!NOTE]
+> If you have enabled the `AZURE_STORAGE_RESOURCE_LOCK_ENABLED` variable, you will need to remove the lock on the Storage Account before running `azd down` as well as the lock on the private endpoint resource for the Storage Account. For more information on how to remove the lock, see [Lock your Azure resources to protect your infrastructure](https://learn.microsoft.com/azure/azure-resource-manager/management/lock-resources).
+
+Some resources will be marked as deleted, but you will need to purge them before they can be redeployed (for example, Azure Key Vault), use:
+
+```sh
+azd down --purge
+```
+
 ---
 
 ## Deploy with GitHub Actions
 
-You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for team-based or production deployments.
+You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for production deployments.
 
 ### 1. Configure GitHub Secrets and Variables
 
