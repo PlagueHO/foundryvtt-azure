@@ -262,28 +262,29 @@ To securely authenticate your GitHub Actions workflow to Azure, configure [Workl
 
 1. Create an Azure AD Application and Federated Credential for your GitHub repository:
 
-   ```powershell
-   $credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow
-   $application = New-AzADApplication -DisplayName $credentialname
-   $policy = "repo:<your GitHub user>/<your GitHub repo>:ref:refs/heads/main"
-   $subscriptionId = '<your Azure subscription>'
+    ```powershell
+    $credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow-production-environment
+    $application = New-AzADApplication -DisplayName $credentialname
+    $policy = "repo:<your GitHub user>/<your GitHub repo>:environment:<Production or your environment name>"
+    $subscriptionId = '<your Azure subscription>'
 
-   New-AzADAppFederatedCredential `
-       -Name $credentialname `
-       -ApplicationObjectId $application.Id `
-       -Issuer 'https://token.actions.githubusercontent.com' `
-       -Audience 'api://AzureADTokenExchange' `
-       -Subject $policy
-   New-AzADServicePrincipal -AppId $application.AppId
+    New-AzADAppFederatedCredential `
+      -Name $credentialname `
+      -ApplicationObjectId $application.Id `
+      -Issuer 'https://token.actions.githubusercontent.com' `
+      -Audience 'api://AzureADTokenExchange' `
+      -Subject $policy
+    New-AzADServicePrincipal -AppId $application.AppId
 
-   New-AzRoleAssignment `
-     -ApplicationId $application.AppId `
-     -RoleDefinitionName Contributor `
-     -Scope "/subscriptions/$subscriptionId" `
-     -Description "The GitHub Actions deployment workflow for Foundry VTT."
-   ```
+   
+    New-AzRoleAssignment `
+      -ApplicationId $application.AppId `
+      -RoleDefinitionName Contributor `
+      -Scope "/subscriptions/$subscriptionId" `
+      -Description "The GitHub Actions deployment workflow for Foundry VTT."
+    ```
 
-   For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
+    For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
 
 ### 4. Example GitHub Actions Workflow
 
