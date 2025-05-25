@@ -1,8 +1,7 @@
 # FoundryVTT Azure Solution Accelerator
 
-[![deploy-foundryvtt](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml/badge.svg)](https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/deploy-foundryvtt.yml)
 [![version][version-shield]][version-url]
-[![CD][cd-shield]][cd-url]
+[![Tests][ct-shield]][ct-url]
 [![License][license-shield]][license-url]
 [![Azure][azure-shield]][azure-url]
 [![IaC][iac-shield]][iac-url]
@@ -320,8 +319,8 @@ Contributions are welcome! Please open issues or pull requests.
 ---
 
 <!-- Badge reference links -->
-[cd-shield]: https://img.shields.io/github/actions/workflow/status/PlagueHO/foundryvtt-azure/continuous-delivery.yml?branch=main&label=CD
-[cd-url]: https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/continuous-delivery.yml
+[ct-shield]: https://img.shields.io/github/actions/workflow/status/PlagueHO/foundryvtt-azure/continuous-testing.yml?branch=main&label=Tests
+[ct-url]: https://github.com/PlagueHO/foundryvtt-azure/actions/workflows/continuous-testing.yml
 
 [license-shield]: https://img.shields.io/github/license/PlagueHO/foundryvtt-azure
 [license-url]: https://github.com/PlagueHO/foundryvtt-azure/blob/main/LICENSE
