@@ -1,13 +1,11 @@
-name: continuous-delivery
-
+name: continuous-testing
+# Because this workflow only performs testing, and not deployment, it is called continuous-testing.
 on:
   push:
     branches:
       - main
     tags:
       - v*
-    paths:
-      - infra/**
   workflow_dispatch:
   
 permissions:

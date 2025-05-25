@@ -1,4 +1,4 @@
-name: test-infrastructure
+name: deploy-infrastructure
 
 on:
   workflow_call:

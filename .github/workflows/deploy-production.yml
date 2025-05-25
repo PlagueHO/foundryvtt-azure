@@ -2,7 +2,6 @@ name: deploy-production
 
 on:
   # This workflow is only triggered manually and on a schedule as it deploys to production.
-  push:  
   workflow_dispatch:
   schedule:
     - cron: '0 14 * * *' # 2am NZT (UTC+12)
@@ -13,8 +12,10 @@ permissions:
 
 jobs:
   deploy-infrastructure:
+    # Ensure this only runs on the main branch
+    if: github.ref == 'refs/heads/main'
     name: Deploy Infrastructure
-    uses: ./.github/workflows/test-infrastructure.yml
+    uses: ./.github/workflows/deploy-infrastructure.yml
     with:
       ENVIRONMENT: Production
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
