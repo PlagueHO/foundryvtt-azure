@@ -757,7 +757,7 @@ output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Co
 // General Outputs
 output AZURE_ENV_NAME string = environmentName
 output AZURE_LOCATION string = location
-output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_RESOURCE_GROUP_NAME string = rg.name
 output AZURE_PRINCIPAL_ID string = principalId
 output AZURE_PRINCIPAL_ID_TYPE string = principalIdType
 

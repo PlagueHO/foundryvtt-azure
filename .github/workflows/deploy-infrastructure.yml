@@ -15,8 +15,32 @@ on:
         description: "The name of the Azure environment"
         required: true
         type: string
-      AZURE_RESOURCE_GROUP:
+      AZURE_RESOURCE_GROUP_NAME:
         description: "The name of the Azure resource group to deploy the application resources to"
+        required: false
+        type: string
+      AZURE_APP_SERVICE_PLAN_SKUNAME:
+        description: "The SKU name for the Azure App Service Plan"
+        required: false
+        type: string
+      AZURE_COMPUTE_SERVICE:
+        description: "The compute service to use"
+        required: false
+        type: string
+      AZURE_DEPLOY_DDB_PROXY:
+        description: "Enable DDB Proxy deployment"
+        required: false
+        type: string
+      AZURE_DEPLOY_DIAGNOSTICS:
+        description: "Enable diagnostics deployment"
+        required: false
+        type: string
+      AZURE_DEPLOY_NETWORKING:
+        description: "Enable networking deployment"
+        required: false
+        type: string
+      AZURE_STORAGE_RESOURCE_LOCK_ENABLED:
+        description: "Enable storage resource lock"
         required: false
         type: string
 
@@ -52,6 +76,13 @@ jobs:
       # Required for azd to provision the infrastructure
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
+      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
+      AZURE_COMPUTE_SERVICE: ${{ inputs.AZURE_COMPUTE_SERVICE }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.AZURE_DEPLOY_DDB_PROXY }}
+      AZURE_DEPLOY_DIAGNOSTICS: ${{ inputs.AZURE_DEPLOY_DIAGNOSTICS }}
+      AZURE_DEPLOY_NETWORKING: ${{ inputs.AZURE_DEPLOY_NETWORKING }}
+      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ inputs.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
 
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
@@ -80,4 +111,4 @@ jobs:
         shell: pwsh
 
       - name: Deploy solution
-        run: azd up -e "$Env:AZURE_ENV_NAME" --no-prompt
+        run: azd up --no-prompt
