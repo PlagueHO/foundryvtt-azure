@@ -24,8 +24,6 @@ Before you begin, ensure you have:
 
 1. An active Azure subscription ([Create a free account](https://azure.microsoft.com/free/)).
 2. [Azure Developer CLI (azd)](https://aka.ms/install-azd) installed and updated.
-3. **Windows Only:** [PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) (for local development).
-4. (Recommended) [Python 3.10+](https://www.python.org/downloads/) for sample tools.
 
 ---
 
@@ -240,9 +238,13 @@ azd down --purge
 
 You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for production deployments.
 
-### 1. Configure GitHub Secrets and Variables
+### 1. Add an Environment in GitHub
 
-Set the following repository **secrets** in your GitHub repository:
+[Create a new environment in your GitHub repository](https://docs.github.com/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment#creating-an-environment) called `Production` (or any name you prefer). This environment will be used to manage secrets and variables for the deployment.
+
+### 2. Configure GitHub Secrets and Variables
+
+Set the following repository **secrets** in the new GitHub environment:
 
 - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal or Workload Identity used to authenticate to Azure.
 - `AZURE_TENANT_ID`: The Tenant ID of the Service Principal or Workload Identity.
@@ -255,7 +257,7 @@ Set the following repository **variables** as needed:
 
 - `AZURE_ENV_NAME`, `AZURE_LOCATION`, `AZURE_COMPUTE_SERVICE`, etc. (see [Configuration Options](#configuration-options)).
 
-### 2. Configure Workload Identity Federation
+### 3. Configure Workload Identity Federation
 
 To securely authenticate your GitHub Actions workflow to Azure, configure [Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation):
 
@@ -284,43 +286,24 @@ To securely authenticate your GitHub Actions workflow to Azure, configure [Workl
 
    For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
 
-### 3. Example GitHub Actions Workflow
+### 4. Example GitHub Actions Workflow
 
-A sample workflow file (`.github/workflows/deploy-foundryvtt.yml`) should:
+Sample workflow files:
 
-- Authenticate to Azure using workload identity.
-- Run `azd up` to provision and deploy the solution.
-- Use the secrets and variables as environment variables.
+- [.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml)
+- [.github/workflows/deploy-infrastructure.yml](.github/workflows/deploy-infrastructure.yml)
 
-Example snippet:
+The deploy-production.yml workflow just calls the deploy-infrastructure.yml workflow to deploy the Foundry VTT solution.
 
-```yaml
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          enable-AzPSSession: false
+The deploy-infrastructure.yml workflow performs the following steps:
 
-      - name: Set up Azure Developer CLI
-        uses: Azure/setup-azd@v1
+1. Load the configuration options from the GitHub Actions environment variables.
+1. Authenticate to Azure using workload identity.
+1. Run `azd up` to provision and deploy the solution.
 
-      - name: Set environment variables
-        run: |
-          azd env set FOUNDRY_USERNAME "${{ secrets.FOUNDRY_USERNAME }}"
-          azd env set FOUNDRY_PASSWORD "${{ secrets.FOUNDRY_PASSWORD }}"
-          azd env set FOUNDRY_ADMIN_KEY "${{ secrets.FOUNDRY_ADMIN_KEY }}"
-          # Set other variables as needed
-          azd env set AZURE_DEPLOY_DIAGNOSTICS "true" # Example: enable diagnostics in CI
-```
+### 5. Complete
+
+Once you have configured the GitHub Actions workflow, you can trigger it manually.
 
 ---
 
