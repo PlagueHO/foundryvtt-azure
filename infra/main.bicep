@@ -349,7 +349,7 @@ var privateEndpoints = effectiveDeployNetworking ? [
   }
 ] : []
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.19.0' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
   name: 'storage-account-deployment'
   scope: rg
   params: {
