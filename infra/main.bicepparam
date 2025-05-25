@@ -15,7 +15,7 @@ param foundryPassword = readEnvironmentVariable('FOUNDRY_PASSWORD', '')
 param foundryAdminKey = readEnvironmentVariable('FOUNDRY_ADMIN_KEY', '')
 
 // Network Isolation
-param deployNetworking = toLower(readEnvironmentVariable('DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
+param deployNetworking = toLower(readEnvironmentVariable('AZURE_DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
 
 // Deploy Log Analytics and Diagnostics
 param deployDiagnostics = toLower(readEnvironmentVariable('AZURE_DEPLOY_DIAGNOSTICS', 'false')) == 'true' ? true : false

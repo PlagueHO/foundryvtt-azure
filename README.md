@@ -103,7 +103,7 @@ azd env set AZURE_LOCATION "EastUS2"
 **Optional parameters:**
 
 ```sh
-azd env set DEPLOY_NETWORK "true" # "false" to deploy without a virtual network
+azd env set AZURE_DEPLOY_NETWORKING "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
 azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
 azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3"
@@ -137,7 +137,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_LOCATION`: Azure region for deployment.
 - `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
 - `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`.
-- `DEPLOY_NETWORK`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
+- `AZURE_DEPLOY_NETWORKING`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
 - `AZURE_STORAGE_RESOURCE_LOCK_ENABLED`: `true` or `false` to apply a `CanNotDelete` lock on the storage account, preventing it from being deleted (e.g. via `azd down`) until the lock is removed. Default: `false`.
