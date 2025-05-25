@@ -27,8 +27,8 @@ jobs:
     with:
       ENVIRONMENT: WebApp
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-      AZURE_ENV_NAME: ${{ format('fvtt-webapp-{1}-{2}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP: ${{ format('fvtt-webapp-{1}-{2}-rg', github.ref_name, github.run_id) }}
+      AZURE_ENV_NAME: ${{ format('fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP: ${{ format('rg-fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -46,8 +46,8 @@ jobs:
     with:
       ENVIRONMENT: ContainerInstance
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-      AZURE_ENV_NAME: ${{ format('fvtt-aci-{1}-{2}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP: ${{ format('fvtt-aci-{1}-{2}-rg', github.ref_name, github.run_id) }}
+      AZURE_ENV_NAME: ${{ format('fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP: ${{ format('rg-fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -56,6 +56,5 @@ jobs:
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
-      
 
-    
+
