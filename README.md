@@ -143,18 +143,17 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_ENV_NAME`: Name for the environment (used in resource names).
 - `AZURE_LOCATION`: Azure region for deployment.
 - `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
-- `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`.
+- `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`. This is the tyoe of principal that will be used for role assignments. Default is `User`. It should be changed to `ServicePrincipal` if you are using a service principal (for example, when deploying via a GitHub Actions workflow).
+- `AZURE_COMPUTE_SERVICE`: `WebApp` or `ContainerInstance` (controls the compute service used for Foundry VTT).
 - `AZURE_DEPLOY_NETWORKING`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
 - `AZURE_STORAGE_RESOURCE_LOCK_ENABLED`: `true` or `false` to apply a `CanNotDelete` lock on the storage account, preventing it from being deleted (e.g. via `azd down`) until the lock is removed. Default: `false`. You will need the `User Access Administrator` role to apply this lock during deployment.
-- `AZURE_DEPLOYMENT_TYPE`: `WebApp` or `ContainerInstance`. Default is `WebApp`.
 - `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., `P1v2`). Default is `P0v3`.
 - `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance, from `1` to `4`. Default is `2`.
 - `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB`: Memory (GB) for Container Instance, from `1` to `16`. Default is `2`.
 - `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy.
 - `AZURE_BASTION_HOST_DEPLOY`: `true` or `false` to deploy Azure Bastion.
-- `AZURE_COMPUTE_SERVICE`: `WebApp` or `ContainerInstance` (controls the compute service used for Foundry VTT).
 - `AZURE_DEPLOY_DIAGNOSTICS`: `true` or `false` to deploy a Log Analytics workspace and send resource diagnostics to it. Default is `false`.
 
 For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
