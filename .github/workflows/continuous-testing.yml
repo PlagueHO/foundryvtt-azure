@@ -28,7 +28,7 @@ jobs:
       ENVIRONMENT: WebApp
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
       AZURE_ENV_NAME: ${{ format('fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP: ${{ format('rg-fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -47,7 +47,7 @@ jobs:
       ENVIRONMENT: ContainerInstance
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
       AZURE_ENV_NAME: ${{ format('fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP: ${{ format('rg-fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
