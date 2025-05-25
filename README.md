@@ -22,7 +22,8 @@ This solution accelerator provisions a secure, flexible, and updatable Foundry V
 Before you begin, ensure you have:
 
 1. An active Azure subscription ([Create a free account](https://azure.microsoft.com/free/)).
-2. [Azure Developer CLI (azd)](https://aka.ms/install-azd) installed and updated.
+1. You will need both `Contributor` and `Role Based Access Control Administrator` roles on the Azure subscription you are deploying to.
+1. [Azure Developer CLI (azd)](https://aka.ms/install-azd) installed and updated.
 
 ---
 
@@ -96,9 +97,12 @@ Set required and optional parameters using `azd env set`. For example:
 azd env set FOUNDRY_USERNAME "<your-foundry-username>"
 azd env set FOUNDRY_PASSWORD "<your-foundry-password>"
 azd env set FOUNDRY_ADMIN_KEY "<your-foundry-admin-key>"
-azd env set AZURE_ENV_NAME "myfoundryenv"
+azd env set AZURE_ENV_NAME "myuniquefvtt"
 azd env set AZURE_LOCATION "EastUS2"
 ```
+
+> [!NOTE]
+> After entering the first `azd env set` command, you will be prompted to **enter a name for your new environment**. This name will be used in resource names and URLs. It should be globally unique across Azure, so choose a name that reflects your Foundry VTT deployment (e.g., `myuniquefvtt`).
 
 **Optional parameters:**
 
@@ -106,11 +110,11 @@ azd env set AZURE_LOCATION "EastUS2"
 azd env set AZURE_DEPLOY_NETWORKING "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
 azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
-azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3"
-azd env set AZURE_CONTAINER_INSTANCE_CPU "2"
-azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2"
-azd env set AZURE_DEPLOY_DDB_PROXY "false"
-azd env set AZURE_BASTION_HOST_DEPLOY "false"
+azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3" # Only for Web App
+azd env set AZURE_CONTAINER_INSTANCE_CPU "2" # Only for Container Instance, from 1 to 4
+azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2" # Only for Container Instance, from 1 to 16
+azd env set AZURE_DEPLOY_DDB_PROXY "false" # Only for Web App
+azd env set AZURE_BASTION_HOST_DEPLOY "false" # Only for Web App and when deploying networking
 azd env set AZURE_DEPLOY_DIAGNOSTICS "false"
 ```
 
@@ -121,6 +125,9 @@ azd env set AZURE_DEPLOY_DIAGNOSTICS "false"
 ```sh
 azd up
 ```
+
+> [!NOTE]
+> The first time you run `azd up`, you will be asked to select an Azure subscription and Azure region you want to deploy the resources into. You should select a subscription that you have `Contributor` and `Role Based Access Control Administrator` roles on.
 
 This command will provision all Azure resources and deploy Foundry VTT using the parameters you set.
 
