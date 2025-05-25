@@ -7,42 +7,6 @@ on:
         description: "The environment to validate the application infrastructure for"
         required: true
         type: string
-      AZURE_LOCATION:
-        description: "The Azure region to deploy the application resources to"
-        required: true
-        type: string
-      AZURE_ENV_NAME:
-        description: "The name of the Azure environment"
-        required: true
-        type: string
-      AZURE_RESOURCE_GROUP_NAME:
-        description: "The name of the Azure resource group to deploy the application resources to"
-        required: false
-        type: string
-      AZURE_APP_SERVICE_PLAN_SKUNAME:
-        description: "The SKU name for the Azure App Service Plan"
-        required: false
-        type: string
-      AZURE_COMPUTE_SERVICE:
-        description: "The compute service to use"
-        required: false
-        type: string
-      AZURE_DEPLOY_DDB_PROXY:
-        description: "Enable DDB Proxy deployment"
-        required: false
-        type: string
-      AZURE_DEPLOY_DIAGNOSTICS:
-        description: "Enable diagnostics deployment"
-        required: false
-        type: string
-      AZURE_DEPLOY_NETWORKING:
-        description: "Enable networking deployment"
-        required: false
-        type: string
-      AZURE_STORAGE_RESOURCE_LOCK_ENABLED:
-        description: "Enable storage resource lock"
-        required: false
-        type: string
 
     secrets:
       AZURE_TENANT_ID:
@@ -67,6 +31,8 @@ on:
 jobs:
   deploy-infrastructure:
     name: Deploy ${{ inputs.ENVIRONMENT }} Infrastructure
+    environment: ${{ inputs.ENVIRONMENT }}
+    runs-on: ubuntu-latest
     env:
       # Required for azd to authenticate with Azure using Federated Credentials
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -74,15 +40,9 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Required for azd to provision the infrastructure
-      AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
-      AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
-      AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
-      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
-      AZURE_COMPUTE_SERVICE: ${{ inputs.AZURE_COMPUTE_SERVICE }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.AZURE_DEPLOY_DDB_PROXY }}
-      AZURE_DEPLOY_DIAGNOSTICS: ${{ inputs.AZURE_DEPLOY_DIAGNOSTICS }}
-      AZURE_DEPLOY_NETWORKING: ${{ inputs.AZURE_DEPLOY_NETWORKING }}
-      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ inputs.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
 
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
@@ -92,8 +52,13 @@ jobs:
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
-    environment: ${{ inputs.ENVIRONMENT }}
-    runs-on: ubuntu-latest
+      # Environment variables for azd
+      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ vars.AZURE_APP_SERVICE_PLAN_SKUNAME }}
+      AZURE_COMPUTE_SERVICE: ${{ vars.AZURE_COMPUTE_SERVICE }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
+      AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
+      AZURE_DEPLOY_NETWORKING: ${{ vars.AZURE_DEPLOY_NETWORKING }}
+      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}      
 
     steps:
       - name: Checkout

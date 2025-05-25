@@ -15,7 +15,7 @@ on:
         description: "The name of the Azure environment"
         required: true
         type: string
-      AZURE_RESOURCE_GROUP:
+      AZURE_RESOURCE_GROUP_NAME:
         description: "The name of the Azure resource group to deploy the application resources to"
         required: false
         type: string
@@ -52,6 +52,7 @@ jobs:
       # Required for azd to provision the infrastructure
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
 
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
@@ -60,6 +61,16 @@ jobs:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+      # Environment variables for azd
+      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ vars.AZURE_APP_SERVICE_PLAN_SKUNAME }}
+      AZURE_COMPUTE_SERVICE: ${{ vars.AZURE_COMPUTE_SERVICE }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
+      AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
+      AZURE_DEPLOY_NETWORKING: ${{ vars.AZURE_DEPLOY_NETWORKING }}
+      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
+      AZURE_CONTAINER_INSTANCE_CPU: ${{ vars.AZURE_CONTAINER_INSTANCE_CPU }}
+      AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB: ${{ vars.AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB }}
 
     environment: ${{ inputs.ENVIRONMENT }}
     runs-on: ubuntu-latest
