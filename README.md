@@ -127,7 +127,7 @@ azd up
 ```
 
 > [!NOTE]
-> The first time you run `azd up`, you will be asked to select an Azure subscription and Azure region you want to deploy the resources into. You should select a subscription that you have `Contributor` and `Role Based Access Control Administrator` roles on.
+> The first time you run `azd up`, you will be asked to select an Azure subscription and Azure region you want to deploy the resources into. You should select a subscription that you have `Contributor` and `Role Based Access Control Administrator` roles on. If you enable the `AZURE_STORAGE_RESOURCE_LOCK_ENABLED` setting during deployment then `User Access Administrator` role as well.
 
 This command will provision all Azure resources and deploy Foundry VTT using the parameters you set.
 
@@ -147,7 +147,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_DEPLOY_NETWORKING`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
-- `AZURE_STORAGE_RESOURCE_LOCK_ENABLED`: `true` or `false` to apply a `CanNotDelete` lock on the storage account, preventing it from being deleted (e.g. via `azd down`) until the lock is removed. Default: `false`.
+- `AZURE_STORAGE_RESOURCE_LOCK_ENABLED`: `true` or `false` to apply a `CanNotDelete` lock on the storage account, preventing it from being deleted (e.g. via `azd down`) until the lock is removed. Default: `false`. You will need the `User Access Administrator` role to apply this lock during deployment.
 - `AZURE_DEPLOYMENT_TYPE`: `WebApp` or `ContainerInstance`. Default is `WebApp`.
 - `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., `P1v2`). Default is `P0v3`.
 - `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance, from `1` to `4`. Default is `2`.
