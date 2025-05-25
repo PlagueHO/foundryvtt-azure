@@ -22,6 +22,8 @@ jobs:
   test-webapp:
     name: Test WebApp Deployment
     uses: ./.github/workflows/test-infrastructure.yml
+    needs:
+      - lint-and-publish-bicep
     with:
       ENVIRONMENT: WebApp
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
