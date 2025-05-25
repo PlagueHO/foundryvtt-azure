@@ -80,4 +80,4 @@ jobs:
         shell: pwsh
 
       - name: Deploy solution
-        run: azd up --no-prompt
+        run: azd up -e "$Env:AZURE_ENV_NAME" --no-prompt
