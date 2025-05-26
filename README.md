@@ -249,48 +249,57 @@ You can also deploy this solution using GitHub Actions for automated CI/CD. This
 
 ### 2. Configure GitHub Secrets and Variables
 
-Set the following repository **secrets** in the new GitHub environment:
+1. Set the following **secrets** in the new GitHub repository or `Production` environment:
 
-- `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal or Workload Identity used to authenticate to Azure.
-- `AZURE_TENANT_ID`: The Tenant ID of the Service Principal or Workload Identity.
-- `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-- `FOUNDRY_USERNAME`: Your Foundry VTT username.
-- `FOUNDRY_PASSWORD`: Your Foundry VTT password.
-- `FOUNDRY_ADMIN_KEY`: The admin key for Foundry VTT.
+    - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal or Workload Identity used to authenticate to Azure.
+    - `AZURE_TENANT_ID`: The Tenant ID of the Service Principal or Workload Identity.
+    - `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
+    - `FOUNDRY_USERNAME`: Your Foundry VTT username.
+    - `FOUNDRY_PASSWORD`: Your Foundry VTT password.
+    - `FOUNDRY_ADMIN_KEY`: The admin key for Foundry VTT.
 
-Set the following repository **variables** as needed:
+    > [!NOTE]
+    > If you're using the same Service Principal, Workload Identity and Foundry information for multiple environments, you can set these secrets at the repository level instead of the environment level.
 
-- `AZURE_ENV_NAME`, `AZURE_LOCATION`, `AZURE_COMPUTE_SERVICE`, etc. (see [Configuration Options](#configuration-options)).
+    ![GitHub repository secrets](docs\images\github-actions-repository-secrets.png)
+
+2. Set the following repository **variables** in the `Production` environment:
+
+    - `AZURE_ENV_NAME`
+    - `AZURE_LOCATION`
+    - `AZURE_COMPUTE_SERVICE`
+
+    ![GitHub Production environment variables](docs\images\github-actions-environment-variables.png)
 
 ### 3. Configure Workload Identity Federation
 
 To securely authenticate your GitHub Actions workflow to Azure, configure [Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation):
 
-1. Create an Azure AD Application and Federated Credential for your GitHub repository:
+Create an Azure AD Application and Federated Credential for your GitHub repository:
 
-    ```powershell
-    $credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow-production-environment
-    $application = New-AzADApplication -DisplayName $credentialname
-    $policy = "repo:<your GitHub user>/<your GitHub repo>:environment:<Production or your environment name>"
-    $subscriptionId = '<your Azure subscription>'
+```powershell
+$credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow-production-environment
+$application = New-AzADApplication -DisplayName $credentialname
+$policy = "repo:<your GitHub user>/<your GitHub repo>:environment:<Production or your environment name>"
+$subscriptionId = '<your Azure subscription>'
 
-    New-AzADAppFederatedCredential `
-      -Name $credentialname `
-      -ApplicationObjectId $application.Id `
-      -Issuer 'https://token.actions.githubusercontent.com' `
-      -Audience 'api://AzureADTokenExchange' `
-      -Subject $policy
-    New-AzADServicePrincipal -AppId $application.AppId
+New-AzADAppFederatedCredential `
+  -Name $credentialname `
+  -ApplicationObjectId $application.Id `
+  -Issuer 'https://token.actions.githubusercontent.com' `
+  -Audience 'api://AzureADTokenExchange' `
+  -Subject $policy
+New-AzADServicePrincipal -AppId $application.AppId
 
-   
-    New-AzRoleAssignment `
-      -ApplicationId $application.AppId `
-      -RoleDefinitionName Contributor `
-      -Scope "/subscriptions/$subscriptionId" `
-      -Description "The GitHub Actions deployment workflow for Foundry VTT."
-    ```
 
-    For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
+New-AzRoleAssignment `
+  -ApplicationId $application.AppId `
+  -RoleDefinitionName Contributor `
+  -Scope "/subscriptions/$subscriptionId" `
+  -Description "The GitHub Actions deployment workflow for Foundry VTT."
+```
+
+For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
 
 ### 4. Example GitHub Actions Workflow
 
@@ -309,7 +318,8 @@ The deploy-infrastructure.yml workflow performs the following steps:
 
 ### 5. Complete
 
-Once you have configured the GitHub Actions workflow, you can trigger it manually.
+Once you have configured the GitHub Actions workflow, you can trigger it manually through the GitHub Actions UI
+![GitHub Actions run Workflow](docs/images/github-actions-run-workflow.png)
 
 ---
 
