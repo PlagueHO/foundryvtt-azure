@@ -107,6 +107,7 @@ azd env set AZURE_LOCATION "EastUS2"
 **Optional parameters:**
 
 ```sh
+azd env set FOUNDRY_DOCKER_IMAGE_TAG "release" # Docker tag for felddy/foundryvtt - Defaults to `release` but allows you to specify a different tag if needed
 azd env set AZURE_DEPLOY_NETWORKING "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
 azd env set AZURE_COMPUTE_SERVICE "Web App" # or "ContainerInstance"
@@ -140,6 +141,7 @@ You can control deployment by setting environment variables before running `azd 
 - `FOUNDRY_USERNAME` (required): Your Foundry VTT username.
 - `FOUNDRY_PASSWORD` (required): Your Foundry VTT password.
 - `FOUNDRY_ADMIN_KEY` (required): The admin key for Foundry VTT.
+- `FOUNDRY_DOCKER_IMAGE_TAG`: Docker image tag for the `felddy/foundryvtt` container. Default is `release`.
 - `AZURE_ENV_NAME`: Name for the environment (used in resource names).
 - `AZURE_LOCATION`: Azure region for deployment.
 - `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
@@ -155,6 +157,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy.
 - `AZURE_BASTION_HOST_DEPLOY`: `true` or `false` to deploy Azure Bastion.
 - `AZURE_DEPLOY_DIAGNOSTICS`: `true` or `false` to deploy a Log Analytics workspace and send resource diagnostics to it. Default is `false`.
+- `FOUNDRY_DOCKER_IMAGE_TAG`: Docker image tag for the `felddy/foundryvtt` container. Default: `release`.
 
 For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 

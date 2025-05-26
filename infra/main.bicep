@@ -47,8 +47,10 @@ param foundryPassword string
 @secure()
 param foundryAdminKey string
 
-// Networking configuration
+@sys.description('Docker image tag to use for the Foundry VTT image.')
+param foundryVttDockerImageTag string = 'release'
 
+// Networking configuration
 @sys.description('Deploy a Virtual Network for network isolation. This may be required for some enviornments.')
 param deployNetworking bool = true
 
@@ -147,9 +149,8 @@ var foundryUsernameSecretName   = 'foundryUsername'
 var foundryPasswordSecretName   = 'foundryPassword'
 var foundryAdminKeySecretName   = 'foundryAdminKey'
 
-// Docker image names and tags
+// Docker image names
 var foundryVttDockerImageName string = 'felddy/foundryvtt'
-var foundryVttDockerImageTag string = 'release'
 var ddbProxyDockerImageName string = 'ghcr.io/mrprimate/ddb-proxy'
 var ddbProxyDockerImageTag string = 'latest'
 

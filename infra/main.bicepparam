@@ -13,6 +13,7 @@ param principalIdType = toLower(readEnvironmentVariable('AZURE_PRINCIPAL_ID_TYPE
 param foundryUsername = readEnvironmentVariable('FOUNDRY_USERNAME', '')
 param foundryPassword = readEnvironmentVariable('FOUNDRY_PASSWORD', '')
 param foundryAdminKey = readEnvironmentVariable('FOUNDRY_ADMIN_KEY', '')
+param foundryVttDockerImageTag = readEnvironmentVariable('FOUNDRY_DOCKER_IMAGE_TAG', 'release')
 
 // Network Isolation
 param deployNetworking = toLower(readEnvironmentVariable('AZURE_DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
