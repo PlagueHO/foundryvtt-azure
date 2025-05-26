@@ -1,41 +1,41 @@
-# Solution: FoundryVTT Azure Deployment
+# Solution: FoundryVTT Azure Solution Accelerator
 
-**Version:** 1.0  
-**Last Updated:** 2024-06-10  
+**Version:** 2.0.0  
+**Last Updated:** 2024-06-09  
 **Owner:** PlagueHO  
 **GitHub Repository:** https://github.com/PlagueHO/foundryvtt-azure
 
 ## 1. Purpose & Scope
 
-This repository provides infrastructure-as-code (IaC) templates and documentation for deploying Foundry Virtual Tabletop (FoundryVTT) on Microsoft Azure. It is intended for developers, system administrators, and hobbyists who wish to automate the deployment and management of FoundryVTT in a cloud environment using Azure resources.
+This repository provides an accelerator for deploying a secure, flexible, and updatable [Foundry Virtual Table Top (Foundry VTT)](https://foundryvtt.com/) server to Microsoft Azure. It is intended for Foundry VTT users, Azure developers, and IT administrators who want to automate and manage Foundry VTT deployments using Azure best practices and Infrastructure as Code (Bicep).
 
 ## 2. Folder Structure
 
 ```
 /
-├── docs/           # Developer and user documentation
-├── infra/          # Infrastructure-as-code templates and deployment scripts
-│   ├── bicep/      # Bicep templates for Azure resource provisioning
-│   ├── scripts/    # Helper scripts for deployment and management
-│   └── ...         # Other infra-related files
-├── specs/          # Machine-readable specifications (if present)
-├── README.md       # Project overview and getting started guide
-├── llms.txt        # Guidance for LLMs (this file)
-└── ...             # Other project files
+├── docs/                # Developer and user documentation, images, and guides
+│   └── images/          # Screenshots and diagrams for documentation
+├── infra/               # Infrastructure as Code (Bicep modules, parameters, abbreviations)
+│   ├── main.bicep       # Main Bicep deployment file
+│   └── abbreviations.json
+├── specs/               # Machine-readable specifications and solution metadata
+├── .github/             # GitHub workflows and prompts
+│   ├── workflows/       # CI/CD workflow definitions (YAML)
+│   └── prompts/         # Prompt instructions for LLMs
+├── llms.txt             # This file: LLM navigation and content discovery
+├── README.md            # Solution overview, usage, and configuration
+├── LICENSE              # License information
+└── ...                  # Other supporting files
 ```
-
-- `docs/`: Contains guides, usage instructions, and reference documentation.
-- `infra/`: Contains all infrastructure code and scripts for Azure deployments.
-- `specs/`: (If present) Contains specifications for the solution.
-- `README.md`: Main entry point for understanding the project.
 
 ## 3. Important Files
 
-- `README.md`: Overview, prerequisites, and instructions for using the repository.
-- `llms.txt`: This file; provides navigation and content discovery guidance for LLMs.
-- `infra/aci.bicep`: Bicep file for deploying FoundryVTT into an Azure Container Instance.
-- `infra/appService.bicep`: Bicep file for deploying FoundryVTT into an Azure App Service WebApp.
-- `docs/`: Contains additional documentation for setup, usage, and troubleshooting.
-- `specs/`: (If present) Contains machine-readable specifications relevant to the solution.
-
+- `README.md`: High-level overview, deployment instructions, configuration options, and architecture.
+- `infra/main.bicep`: Main Bicep template for Azure resource provisioning.
+- `infra/abbreviations.json`: Abbreviations used for resource naming in Bicep templates.
+- `specs/`: Contains machine-readable specifications and metadata for the solution.
+- `docs/`: Contains user and developer documentation, including images and guides.
+- `.github/workflows/`: Contains GitHub Actions workflows for CI/CD and deployment automation.
+- `.github/prompts/`: Contains prompt instructions for LLMs and automation.
+- `llms.txt`: (This file) Guidance for LLMs on navigating and understanding the repository.
 Refer to the `README.md` for detailed setup and usage instructions. For infrastructure details, see the files in the `infra/` folder.

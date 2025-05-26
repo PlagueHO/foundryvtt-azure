@@ -51,7 +51,7 @@ You can choose which Azure compute service to use for running Foundry VTT by set
 Set the compute service using:
 
 ```sh
-azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
+azd env set AZURE_COMPUTE_SERVICE "Web App" # or "Container Instance"
 ```
 
 ### Feature Comparison
@@ -109,7 +109,7 @@ azd env set AZURE_LOCATION "EastUS2"
 ```sh
 azd env set AZURE_DEPLOY_NETWORKING "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
-azd env set AZURE_COMPUTE_SERVICE "WebApp" # or "ContainerInstance"
+azd env set AZURE_COMPUTE_SERVICE "Web App" # or "ContainerInstance"
 azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3" # Only for Web App
 azd env set AZURE_CONTAINER_INSTANCE_CPU "2" # Only for Container Instance, from 1 to 4
 azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2" # Only for Container Instance, from 1 to 16
@@ -144,7 +144,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_LOCATION`: Azure region for deployment.
 - `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
 - `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`. This is the tyoe of principal that will be used for role assignments. Default is `User`. It should be changed to `ServicePrincipal` if you are using a service principal (for example, when deploying via a GitHub Actions workflow).
-- `AZURE_COMPUTE_SERVICE`: `WebApp` or `ContainerInstance` (controls the compute service used for Foundry VTT).
+- `AZURE_COMPUTE_SERVICE`: `Web App` or `Container Instance` (controls the compute service used for Foundry VTT).
 - `AZURE_DEPLOY_NETWORKING`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
