@@ -268,9 +268,10 @@ You can also deploy this solution using GitHub Actions for automated CI/CD. This
 
 2. Set the following repository **variables** in the `Production` environment:
 
-    - `AZURE_ENV_NAME`
-    - `AZURE_LOCATION`
-    - `AZURE_COMPUTE_SERVICE`
+    - `AZURE_ENV_NAME` - A unique name for your Foundry VTT environment (e.g., `myuniquefvtt01`).
+    - `AZURE_LOCATION` - The name of the Azure region to deploy to (e.g., `EastUS2`).
+    - `AZURE_COMPUTE_SERVICE` - Set to `Web App` or `Container Instance` to choose the compute service for Foundry VTT.
+    - `AZD_PROVISION_NO_STATE` - Set to `true` to force reprovisioning of resources on each deployment. This is useful for production deployments to ensure the latest configuration is applied or if changes have been made to production outside of the GitHub Actions workflow.
 
     ![GitHub Production environment variables](docs\images\github-actions-environment-variables.png)
 

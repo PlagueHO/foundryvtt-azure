@@ -63,7 +63,9 @@ jobs:
       AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB: ${{ vars.AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB }}
       AZURE_STORAGE_PUBLIC_ACCESS: ${{ vars.AZURE_STORAGE_PUBLIC_ACCESS }}
       FOUNDRY_DOCKER_IMAGE_TAG: ${{ vars.FOUNDRY_DOCKER_IMAGE_TAG }}
-      # end of env block
+
+      # Set AZD_PROVISION_NO_STATE to true to force reprovisioning of the infrastructure
+      AZD_PROVISION_NO_STATE: ${{ vars.AZD_PROVISION_NO_STATE }}
 
     steps:
       - name: Checkout
@@ -80,5 +82,10 @@ jobs:
             --tenant-id "$Env:AZURE_TENANT_ID"
         shell: pwsh
 
-      - name: Deploy solution
-        run: azd up --no-prompt
+      - name: Provision Infrastructure
+        run: |
+          args="--no-prompt"
+          if [ "${AZD_PROVISION_NO_STATE}" = "true" ]; then
+            args="$args --no-state"
+          fi
+          azd provision $args
