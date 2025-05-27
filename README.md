@@ -264,7 +264,7 @@ You can also deploy this solution using GitHub Actions for automated CI/CD. This
     > [!NOTE]
     > If you're using the same Service Principal, Workload Identity and Foundry information for multiple environments, you can set these secrets at the repository level instead of the environment level.
 
-    ![GitHub repository secrets](docs\images\github-actions-repository-secrets.png)
+    ![GitHub repository secrets](docs/images/github-actions-repository-secrets.png)
 
 2. Set the following repository **variables** in the `Production` environment:
 
@@ -273,7 +273,7 @@ You can also deploy this solution using GitHub Actions for automated CI/CD. This
     - `AZURE_COMPUTE_SERVICE` - Set to `Web App` or `Container Instance` to choose the compute service for Foundry VTT.
     - `AZD_PROVISION_NO_STATE` - Set to `true` to force reprovisioning of resources on each deployment. This is useful for production deployments to ensure the latest configuration is applied or if changes have been made to production outside of the GitHub Actions workflow.
 
-    ![GitHub Production environment variables](docs\images\github-actions-environment-variables.png)
+    ![GitHub Production environment variables](docs/images/github-actions-environment-variables.png)
 
 ### 3. Configure Workload Identity Federation
 
