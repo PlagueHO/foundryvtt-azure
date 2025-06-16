@@ -1,8 +1,9 @@
 ---
-mode: 'edit'
+mode: 'agent'
 description: 'Update the llms.txt file in the root folder to reflect changes in documentation or specifications'
+tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'githubRepo', 'openSimpleBrowser', 'problems', 'runTasks', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI']
 ---
-Your task is to update the [llms.txt](../../llms.txt) file located in the root of the repository. This file provides high-level guidance to large language models (LLMs) on where to find relevant content for understanding the solution's purpose and specifications.
+Your task is to update the [llms.txt](/llms.txt) file located in the root of the repository. This file provides high-level guidance to large language models (LLMs) on where to find relevant content for understanding the solution's purpose and specifications.
 
 **Instructions:**
 - Ensure the `llms.txt` file accurately references all folders and files that are important for LLM comprehension, including the `specs/` folder (for machine-readable specifications) and the `docs/` folder (for developer and user documentation).
@@ -18,7 +19,7 @@ Example structure for `llms.txt`:
 **Version:** [Optional: e.g., 1.0, Date]
 **Last Updated:** [Optional: YYYY-MM-DD]
 **Owner:** [Optional: Team/Individual responsible for this solution]
-**GitHub Repository:** https://github.com/PlagueHO/foundryvtt-azure
+**GitHub Repository:** https://github.com/PlagueHO/azure-ai-foundry-jumpstart
 
 ## 1. Purpose & Scope
 

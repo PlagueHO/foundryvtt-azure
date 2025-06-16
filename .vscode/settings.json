@@ -1,8 +1,37 @@
 {
-    "markdownlint.config": {
-        "MD028": false,
-        "MD025": {
-            "front_matter_title": ""
+    "python-envs.pythonProjects": [
+        {
+            "path": "",
+            "envManager": "ms-python.python:system",
+            "packageManager": "ms-python.python:pip"
         }
-    }
+    ],
+    "python.analysis.extraPaths": [
+        "src"
+    ],
+    "chat.mcp.serverSampling": {
+        "azure-ai-foundry-jumpstart/.vscode/mcp.json: github": {
+            "allowedModels": [
+                "github.copilot-chat/claude-3.5-sonnet",
+                "github.copilot-chat/claude-3.7-sonnet",
+                "github.copilot-chat/claude-3.7-sonnet-thought",
+                "github.copilot-chat/claude-opus-4",
+                "github.copilot-chat/claude-sonnet-4",
+                "github.copilot-chat/gemini-2.0-flash-001",
+                "github.copilot-chat/gemini-2.5-pro",
+                "github.copilot-chat/gpt-4.1",
+                "github.copilot-chat/gpt-4.5-preview",
+                "github.copilot-chat/gpt-4o",
+                "github.copilot-chat/o1",
+                "github.copilot-chat/o3",
+                "github.copilot-chat/o3-mini",
+                "github.copilot-chat/o4-mini"
+            ]
+        }
+    },
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "The first line should be summary of no more than 50 characters starting with classification of commit from: `CHORE:`|`FIX:`|`CHANGE:`|`BREAKING CHANGE:`|`TESTS:`|`SECURITY:`|`COMPLEX:`. The second line should be blank. The following lines should be the full summary with each item starting with a `-`. Any summary item that is security related should start with `SECURITY:`. Any summary item change that causes a breaking change to a feature/interface/dependency should start with `BREAKING CHANGE:`"
+        }
+    ]
 }
