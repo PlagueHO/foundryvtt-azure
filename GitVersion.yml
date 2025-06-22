@@ -1,0 +1,70 @@
+# GitVersion configuration for Continuous Delivery
+# Compatible with GitVersion 6.3.x
+mode: ContinuousDelivery
+
+# Assembly versioning strategy
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatchTag
+assembly-informational-format: '{InformationalVersion}'
+
+# Version increment strategy
+increment: Inherit
+
+# Tag prefix for releases
+tag-prefix: 'v'
+
+# Major version bump triggers
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+
+# Branch configuration for Continuous Delivery
+branches:
+  # Main/Master branch - production releases
+  main:
+    regex: '^(main|master)$'
+    mode: ContinuousDelivery
+    label: ''
+    increment: Patch
+
+  # Develop branch - pre-release versions
+  develop:
+    regex: '^dev(elop)?(ment)?$'
+    mode: ContinuousDelivery
+    label: 'alpha'
+    increment: Minor
+
+  # Release branches - release candidates
+  release:
+    regex: '^releases?[/-]'
+    mode: ContinuousDelivery
+    label: 'beta'
+    increment: None
+
+  # Feature branches
+  feature:
+    regex: '^features?[/-]'
+    mode: ContinuousDelivery
+    label: 'feature'
+    increment: Inherit
+
+  # Pull request branches
+  pull-request:
+    regex: '^(pull|pull\-requests|pr)[/-]'
+    mode: ContinuousDelivery
+    label: 'pr'
+    increment: Inherit
+
+  # Hotfix branches
+  hotfix:
+    regex: '^hotfix(es)?[/-]'
+    mode: ContinuousDelivery
+    label: 'beta'
+    increment: Patch
+
+  # Support branches for maintenance
+  support:
+    regex: '^support[/-]'
+    mode: ContinuousDelivery
+    label: ''
+    increment: Patch
