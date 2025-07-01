@@ -23,8 +23,6 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    reviewers:
-      - "PlagueHO"
     rebase-strategy: "auto"
     groups:
       gh-actions:
