@@ -3,8 +3,6 @@ name: deploy-production
 on:
   # This workflow is only triggered manually and on a schedule as it deploys to production.
   workflow_dispatch:
-  schedule:
-    - cron: '0 14 * * *' # 2am NZT (UTC+12)
     
 permissions:
   id-token: write
