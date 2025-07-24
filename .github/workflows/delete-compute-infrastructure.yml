@@ -1,0 +1,215 @@
+name: delete-compute-infrastructure
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        description: "The environment to delete compute resources from"
+        required: true
+        type: string
+
+    secrets:
+      AZURE_TENANT_ID:
+        description: "The Azure tenant ID to use for authentication to Azure for deletion"
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        description: "The Azure subscription ID to use for authentication to Azure for deletion"
+        required: true
+      AZURE_CLIENT_ID:
+        description: "The Azure client ID to use for authentication to Azure for deletion"
+        required: true
+
+jobs:
+  delete-compute-infrastructure:
+    name: Delete ${{ inputs.ENVIRONMENT }} Compute Resources
+    environment: ${{ inputs.ENVIRONMENT }}
+    runs-on: ubuntu-latest
+    env:
+      # Required for Azure CLI to authenticate with Azure using Federated Credentials
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Required to identify the environment and resources
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
+
+      # Environment variables to determine which compute service to delete
+      AZURE_COMPUTE_SERVICE: ${{ vars.AZURE_COMPUTE_SERVICE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Azure CLI
+        uses: azure/setup-azd@v2.1.0
+
+      - name: Authenticate Azure CLI (Federated Credentials)
+        run: |
+          az login --service-principal \
+            --username "$AZURE_CLIENT_ID" \
+            --tenant "$AZURE_TENANT_ID" \
+            --federated-token "$(curl -sLS "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://AzureADTokenExchange" -H "User-Agent: actions/oidc-client" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" | jq -r '.value')"
+
+      - name: Delete Compute Resources
+        run: |
+          # Set resource group name with fallback
+          RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+          
+          echo "Starting deletion of compute resources in environment: $AZURE_ENV_NAME"
+          echo "Resource Group: $RG_NAME"
+          echo "Compute Service Type: $AZURE_COMPUTE_SERVICE"
+          echo "Subscription: $AZURE_SUBSCRIPTION_ID"
+          
+          # Set subscription context
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+          
+          # Delete compute resources based on the compute service type
+          case "$AZURE_COMPUTE_SERVICE" in
+            "Web App")
+              echo "Deleting Azure App Service (Web App) resources..."
+              
+              # Get the resource names (following the naming pattern from main.bicep)
+              APP_SERVICE_PLAN_NAME="asp-${AZURE_ENV_NAME}"
+              WEB_APP_NAME="${AZURE_ENV_NAME}"
+              DDB_PROXY_NAME="${AZURE_ENV_NAME}ddbproxy"
+              
+              # Check if main Web App exists and delete it
+              if az webapp show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting Web App: $WEB_APP_NAME"
+                az webapp delete --name "$WEB_APP_NAME" --resource-group "$RG_NAME"
+                echo "✅ Web App deleted successfully"
+              else
+                echo "ℹ️  Web App $WEB_APP_NAME not found or already deleted"
+              fi
+              
+              # Check and delete DDB Proxy Web App if it exists (must be deleted before App Service Plan)
+              if az webapp show --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting DDB Proxy Web App: $DDB_PROXY_NAME"
+                az webapp delete --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME"
+                echo "✅ DDB Proxy Web App deleted successfully"
+              else
+                echo "ℹ️  DDB Proxy Web App $DDB_PROXY_NAME not found or already deleted"
+              fi
+              
+              # Check if App Service Plan exists and delete it (after all Web Apps are deleted)
+              if az appservice plan show --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting App Service Plan: $APP_SERVICE_PLAN_NAME"
+                az appservice plan delete --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" --yes
+                echo "✅ App Service Plan deleted successfully"
+              else
+                echo "ℹ️  App Service Plan $APP_SERVICE_PLAN_NAME not found or already deleted"
+              fi
+              ;;
+              
+            "Container Instance")
+              echo "Deleting Azure Container Instance resources..."
+              
+              # Get the Container Instance name (following the naming pattern from main.bicep)
+              CONTAINER_INSTANCE_NAME="ci-${AZURE_ENV_NAME}"
+              
+              # Check if Container Instance exists and delete it
+              if az container show --name "$CONTAINER_INSTANCE_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting Container Instance: $CONTAINER_INSTANCE_NAME"
+                az container delete --name "$CONTAINER_INSTANCE_NAME" --resource-group "$RG_NAME" --yes
+                echo "✅ Container Instance deleted successfully"
+              else
+                echo "ℹ️  Container Instance $CONTAINER_INSTANCE_NAME not found or already deleted"
+              fi
+              ;;
+              
+            "Container App")
+              echo "Deleting Azure Container Apps resources..."
+              
+              # Get the Container App name (following the expected naming pattern)
+              CONTAINER_APP_NAME="ca-${AZURE_ENV_NAME}"
+              CONTAINER_APP_ENV_NAME="cae-${AZURE_ENV_NAME}"
+              
+              # Check if Container App exists and delete it
+              if az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting Container App: $CONTAINER_APP_NAME"
+                az containerapp delete --name "$CONTAINER_APP_NAME" --resource-group "$RG_NAME" --yes
+                echo "✅ Container App deleted successfully"
+              else
+                echo "ℹ️  Container App $CONTAINER_APP_NAME not found or already deleted"
+              fi
+              
+              # Check if Container Apps Environment exists and delete it
+              if az containerapp env show --name "$CONTAINER_APP_ENV_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting Container Apps Environment: $CONTAINER_APP_ENV_NAME"
+                az containerapp env delete --name "$CONTAINER_APP_ENV_NAME" --resource-group "$RG_NAME" --yes
+                echo "✅ Container Apps Environment deleted successfully"
+              else
+                echo "ℹ️  Container Apps Environment $CONTAINER_APP_ENV_NAME not found or already deleted"
+              fi
+              ;;
+              
+            *)
+              echo "❌ Unknown compute service type: $AZURE_COMPUTE_SERVICE"
+              echo "Supported types: 'Web App', 'Container Instance', 'Container App'"
+              exit 1
+              ;;
+          esac
+          
+          echo ""
+          echo "🎉 Compute resource deletion completed!"
+          echo "💰 This should help reduce your Azure costs while preserving your data and configuration."
+          echo "🚀 To redeploy compute resources, use the deploy-production workflow."
+
+      - name: Verify Resource Deletion
+        run: |
+          # Set resource group name with fallback
+          RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+          
+          echo "Verifying resource deletion..."
+          
+          # List remaining compute resources to confirm deletion
+          case "$AZURE_COMPUTE_SERVICE" in
+            "Web App")
+              echo "Checking for remaining App Service resources..."
+              REMAINING_WEBAPPS=$(az webapp list --resource-group "$RG_NAME" --query "[?contains(name, '${AZURE_ENV_NAME}')].name" -o tsv)
+              REMAINING_PLANS=$(az appservice plan list --resource-group "$RG_NAME" --query "[?contains(name, '${AZURE_ENV_NAME}')].name" -o tsv)
+              
+              if [ -z "$REMAINING_WEBAPPS" ] && [ -z "$REMAINING_PLANS" ]; then
+                echo "✅ All App Service resources have been successfully deleted"
+              else
+                echo "⚠️  Some App Service resources may still exist:"
+                [ ! -z "$REMAINING_WEBAPPS" ] && echo "  - Web Apps: $REMAINING_WEBAPPS"
+                [ ! -z "$REMAINING_PLANS" ] && echo "  - App Service Plans: $REMAINING_PLANS"
+              fi
+              ;;
+              
+            "Container Instance")
+              echo "Checking for remaining Container Instance resources..."
+              REMAINING_CI=$(az container list --resource-group "$RG_NAME" --query "[?contains(name, '${AZURE_ENV_NAME}')].name" -o tsv)
+              
+              if [ -z "$REMAINING_CI" ]; then
+                echo "✅ All Container Instance resources have been successfully deleted"
+              else
+                echo "⚠️  Some Container Instance resources may still exist: $REMAINING_CI"
+              fi
+              ;;
+              
+            "Container App")
+              echo "Checking for remaining Container Apps resources..."
+              REMAINING_CA=$(az containerapp list --resource-group "$RG_NAME" --query "[?contains(name, '${AZURE_ENV_NAME}')].name" -o tsv 2>/dev/null || echo "")
+              REMAINING_CAE=$(az containerapp env list --resource-group "$RG_NAME" --query "[?contains(name, '${AZURE_ENV_NAME}')].name" -o tsv 2>/dev/null || echo "")
+              
+              if [ -z "$REMAINING_CA" ] && [ -z "$REMAINING_CAE" ]; then
+                echo "✅ All Container Apps resources have been successfully deleted"
+              else
+                echo "⚠️  Some Container Apps resources may still exist:"
+                [ ! -z "$REMAINING_CA" ] && echo "  - Container Apps: $REMAINING_CA"
+                [ ! -z "$REMAINING_CAE" ] && echo "  - Container Apps Environments: $REMAINING_CAE"
+              fi
+              ;;
+          esac
+          
+          echo ""
+          echo "📋 Preserved infrastructure components:"
+          echo "  - Storage Account and Azure Files (your game data)"
+          echo "  - Key Vault (your secrets and certificates)"
+          echo "  - Virtual Network and networking components"
+          echo "  - Log Analytics workspace (your logs and monitoring)"
+          echo "  - Resource Group"
