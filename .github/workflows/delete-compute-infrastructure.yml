@@ -70,11 +70,12 @@ jobs:
             "Web App")
               echo "Deleting Azure App Service (Web App) resources..."
               
-              # Get the App Service Plan name (following the naming pattern from main.bicep)
+              # Get the resource names (following the naming pattern from main.bicep)
               APP_SERVICE_PLAN_NAME="asp-${AZURE_ENV_NAME}"
-              WEB_APP_NAME="app-${AZURE_ENV_NAME}"
+              WEB_APP_NAME="${AZURE_ENV_NAME}"
+              DDB_PROXY_NAME="${AZURE_ENV_NAME}ddbproxy"
               
-              # Check if Web App exists and delete it
+              # Check if main Web App exists and delete it
               if az webapp show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
                 echo "Deleting Web App: $WEB_APP_NAME"
                 az webapp delete --name "$WEB_APP_NAME" --resource-group "$RG_NAME"
@@ -83,23 +84,22 @@ jobs:
                 echo "ℹ️  Web App $WEB_APP_NAME not found or already deleted"
               fi
               
-              # Check if App Service Plan exists and delete it
-              if az appservice plan show --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
-                echo "Deleting App Service Plan: $APP_SERVICE_PLAN_NAME"
-                az appservice plan delete --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" --yes
-                echo "✅ App Service Plan deleted successfully"
-              else
-                echo "ℹ️  App Service Plan $APP_SERVICE_PLAN_NAME not found or already deleted"
-              fi
-              
-              # Check and delete DDB Proxy Web App if it exists
-              DDB_PROXY_NAME="app-ddb-proxy-${AZURE_ENV_NAME}"
+              # Check and delete DDB Proxy Web App if it exists (must be deleted before App Service Plan)
               if az webapp show --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
                 echo "Deleting DDB Proxy Web App: $DDB_PROXY_NAME"
                 az webapp delete --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME"
                 echo "✅ DDB Proxy Web App deleted successfully"
               else
                 echo "ℹ️  DDB Proxy Web App $DDB_PROXY_NAME not found or already deleted"
+              fi
+              
+              # Check if App Service Plan exists and delete it (after all Web Apps are deleted)
+              if az appservice plan show --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
+                echo "Deleting App Service Plan: $APP_SERVICE_PLAN_NAME"
+                az appservice plan delete --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" --yes
+                echo "✅ App Service Plan deleted successfully"
+              else
+                echo "ℹ️  App Service Plan $APP_SERVICE_PLAN_NAME not found or already deleted"
               fi
               ;;
               
