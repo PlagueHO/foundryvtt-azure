@@ -179,7 +179,7 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 }
 
 // ------------- LOG ANALYTICS WORKSPACE (OPTIONAL) -------------
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.2' = if (deployDiagnostics) {
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.12.0' = if (deployDiagnostics) {
   name: 'log-analytics-workspace-deployment'
   scope: rg
   params: {
@@ -259,7 +259,7 @@ module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-
   }
 }
 
-module virtualNetwork 'br/public:avm/res/network/virtual-network:0.6.1' = if (effectiveDeployNetworking) {
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.7.0' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
   scope: rg
   params: {
@@ -350,13 +350,13 @@ var privateEndpoints = effectiveDeployNetworking ? [
   }
 ] : []
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.20.0' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.25.1' = {
   name: 'storage-account-deployment'
   scope: rg
   params: {
     name: storageAccountName
     diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
-    enableHierarchicalNamespace: false
+    enableHierarchicalNamespace: false  // Explicitly set to false (was implicitly false before)
     enableNfsV3: false
     enableSftp: false
     fileServices: {
@@ -398,7 +398,7 @@ resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' 
 }
 
 // ------------- KEY VAULT -------------
-module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.13.0' = {
   name: 'key-vault-deployment'
   scope: rg
   dependsOn: [
@@ -486,7 +486,7 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeServ
   }
 }
 
-module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService == 'Web App') {
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.17.0' = if (computeService == 'Web App') {
   name: 'web-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -569,7 +569,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
       numberOfWorkers: 1
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
+    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
     diagnosticSettings: deployDiagnostics ? [
       {
         name: sendToLogAnalyticsName
@@ -589,7 +589,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.16.0' = if (computeService
   }
 }
 
-module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService == 'Web App' && deployDdbProxy) {
+module webAppDdbProxy 'br/public:avm/res/web/site:0.17.0' = if (computeService == 'Web App' && deployDdbProxy) {
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {
@@ -638,13 +638,13 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.16.0' = if (computeService =
       healthCheckPath: '/ping' // Added health check path
     }
     tags: tags
-    virtualNetworkSubnetId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
+    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
   }
 }
 
 // ------------- CONTAINER INSTANCE (IF COMPUTE SERVICE IS CONTAINER INSTANCE) -------------
 // TODO: AVM module doesn't currently support diagnostics
-module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.0' = if (computeService == 'Container Instance') {
+module containerGroup 'br/public:avm/res/container-instance/container-group:0.6.0' = if (computeService == 'Container Instance') {
   name: 'foundry-vtt-container-group-deployment'
   scope: rg
   params: {
@@ -719,7 +719,7 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.5.
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
 // ------------- BASTION HOST (OPTIONAL) -------------
-module bastionHost 'br/public:avm/res/network/bastion-host:0.6.1' = if (effectiveDeployNetworking && bastionHostDeploy) {
+module bastionHost 'br/public:avm/res/network/bastion-host:0.7.0' = if (effectiveDeployNetworking && bastionHostDeploy) {
   name: 'bastion-host-deployment'
   scope: rg
   params: {
