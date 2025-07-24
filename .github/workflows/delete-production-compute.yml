@@ -1,0 +1,25 @@
+name: delete-production-compute
+
+on:
+  # Runs daily at 4:00 AM NZT (15:00 UTC) to delete compute resources for cost savings
+  schedule:
+    - cron: '0 15 * * *'
+  # This workflow can also be triggered manually
+  workflow_dispatch:
+    
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  delete-compute-infrastructure:
+    # Ensure this only runs on the main branch
+    if: github.ref == 'refs/heads/main'
+    name: Delete Production Compute Resources
+    uses: ./.github/workflows/delete-compute-infrastructure.yml
+    with:
+      ENVIRONMENT: Production
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
