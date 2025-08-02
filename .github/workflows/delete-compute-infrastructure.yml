@@ -80,6 +80,10 @@ jobs:
                 echo "Deleting Web App: $WEB_APP_NAME"
                 az webapp delete --name "$WEB_APP_NAME" --resource-group "$RG_NAME"
                 echo "✅ Web App deleted successfully"
+                
+                # Wait a moment to avoid rate limiting
+                echo "⏳ Waiting 30 seconds to avoid rate limiting..."
+                sleep 30
               else
                 echo "ℹ️  Web App $WEB_APP_NAME not found or already deleted"
               fi
@@ -87,17 +91,57 @@ jobs:
               # Check and delete DDB Proxy Web App if it exists (must be deleted before App Service Plan)
               if az webapp show --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
                 echo "Deleting DDB Proxy Web App: $DDB_PROXY_NAME"
-                az webapp delete --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME"
-                echo "✅ DDB Proxy Web App deleted successfully"
+                
+                # Retry logic for DDB Proxy deletion with exponential backoff
+                RETRY_COUNT=0
+                MAX_RETRIES=3
+                while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                  if az webapp delete --name "$DDB_PROXY_NAME" --resource-group "$RG_NAME" 2>/dev/null; then
+                    echo "✅ DDB Proxy Web App deleted successfully"
+                    break
+                  else
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    WAIT_TIME=$((30 * RETRY_COUNT))
+                    echo "⚠️  Deletion failed (attempt $RETRY_COUNT/$MAX_RETRIES). Waiting $WAIT_TIME seconds before retry..."
+                    sleep $WAIT_TIME
+                    
+                    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                      echo "❌ Failed to delete DDB Proxy Web App after $MAX_RETRIES attempts"
+                      echo "⚠️  Continuing with App Service Plan deletion..."
+                    fi
+                  fi
+                done
               else
                 echo "ℹ️  DDB Proxy Web App $DDB_PROXY_NAME not found or already deleted"
               fi
               
+              # Wait before deleting App Service Plan
+              echo "⏳ Waiting 45 seconds before deleting App Service Plan..."
+              sleep 45
+              
               # Check if App Service Plan exists and delete it (after all Web Apps are deleted)
               if az appservice plan show --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
                 echo "Deleting App Service Plan: $APP_SERVICE_PLAN_NAME"
-                az appservice plan delete --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" --yes
-                echo "✅ App Service Plan deleted successfully"
+                
+                # Retry logic for App Service Plan deletion
+                RETRY_COUNT=0
+                MAX_RETRIES=3
+                while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                  if az appservice plan delete --name "$APP_SERVICE_PLAN_NAME" --resource-group "$RG_NAME" --yes 2>/dev/null; then
+                    echo "✅ App Service Plan deleted successfully"
+                    break
+                  else
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    WAIT_TIME=$((30 * RETRY_COUNT))
+                    echo "⚠️  App Service Plan deletion failed (attempt $RETRY_COUNT/$MAX_RETRIES). Waiting $WAIT_TIME seconds before retry..."
+                    sleep $WAIT_TIME
+                    
+                    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                      echo "❌ Failed to delete App Service Plan after $MAX_RETRIES attempts"
+                      echo "⚠️  You may need to manually delete it later from the Azure portal"
+                    fi
+                  fi
+                done
               else
                 echo "ℹ️  App Service Plan $APP_SERVICE_PLAN_NAME not found or already deleted"
               fi
