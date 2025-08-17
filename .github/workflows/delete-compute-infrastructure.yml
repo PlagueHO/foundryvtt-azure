@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Azure CLI
-        uses: azure/setup-azd@v2.1.0
+        uses: azure/setup-azd@v2.2.0
 
       - name: Authenticate Azure CLI (Federated Credentials)
         run: |
