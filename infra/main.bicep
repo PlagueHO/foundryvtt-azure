@@ -274,7 +274,7 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.7.0' = if (ef
 }
 
 // ---------- PRIVATE DNS ZONES (REQUIRED FOR NETWORK ISOLATION) ----------
-module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (effectiveDeployNetworking) {
+module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = if (effectiveDeployNetworking) {
   name: 'storage-file-private-dns-zone'
   scope: rg
   params: {
@@ -290,7 +290,7 @@ module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7
   }
 }
 
-module keyVaultPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.7.1' = if (effectiveDeployNetworking) {
+module keyVaultPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = if (effectiveDeployNetworking) {
   name: 'keyvault-private-dns-zone'
   scope: rg
   params: {
@@ -350,12 +350,18 @@ var privateEndpoints = effectiveDeployNetworking ? [
   }
 ] : []
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.25.1' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.26.2' = {
   name: 'storage-account-deployment'
   scope: rg
   params: {
     name: storageAccountName
-    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
+    diagnosticSettings: deployDiagnostics ? [
+      {
+        name: sendToLogAnalyticsName
+        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        metricCategories: []
+      }
+    ] : []
     enableHierarchicalNamespace: false  // Explicitly set to false (was implicitly false before)
     enableNfsV3: false
     enableSftp: false
@@ -398,7 +404,7 @@ resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' 
 }
 
 // ------------- KEY VAULT -------------
-module keyVault 'br/public:avm/res/key-vault/vault:0.13.0' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
   name: 'key-vault-deployment'
   scope: rg
   dependsOn: [
@@ -461,7 +467,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.0' = {
       (computeService == 'Web App' ? [
         {
           roleDefinitionIdOrName: 'Key Vault Secrets User'
-          principalId: webAppFoundryVtt.outputs.?systemAssignedMIPrincipalId // Removed '?' as identity is always enabled for WebApp
+          principalId: webAppFoundryVtt.outputs.?systemAssignedMIPrincipalId
           principalType: 'ServicePrincipal'
         }
       ] : [])
@@ -470,7 +476,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.0' = {
 }
 
 // ------------- APP SERVICE PLAN (IF COMPUTE SERVICE IS WEB APP) -------------
-module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeService == 'Web App') {
+module appServicePlan 'br/public:avm/res/web/serverfarm:0.5.0' = if (computeService == 'Web App') {
   name: 'app-service-plan-deployment'
   scope: rg
   params: {
@@ -486,7 +492,7 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.4.1' = if (computeServ
   }
 }
 
-module webAppFoundryVtt 'br/public:avm/res/web/site:0.17.0' = if (computeService == 'Web App') {
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.19.2' = if (computeService == 'Web App') {
   name: 'web-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -559,7 +565,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.17.0' = if (computeService
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${storageAccountKeySecretName})'
         }
       ]
-      vnetRouteAllEnabled: effectiveDeployNetworking // Route all traffic through VNet if integrated, for KV access
+      vnetRouteAllEnabled: effectiveDeployNetworking
       detailedErrorLoggingEnabled: true
       ftpsState: 'FtpsOnly'
       httpLoggingEnabled: true
@@ -589,7 +595,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.17.0' = if (computeService
   }
 }
 
-module webAppDdbProxy 'br/public:avm/res/web/site:0.17.0' = if (computeService == 'Web App' && deployDdbProxy) {
+module webAppDdbProxy 'br/public:avm/res/web/site:0.19.2' = if (computeService == 'Web App' && deployDdbProxy) {
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {
@@ -719,7 +725,7 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.6.
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
 // ------------- BASTION HOST (OPTIONAL) -------------
-module bastionHost 'br/public:avm/res/network/bastion-host:0.7.0' = if (effectiveDeployNetworking && bastionHostDeploy) {
+module bastionHost 'br/public:avm/res/network/bastion-host:0.8.0' = if (effectiveDeployNetworking && bastionHostDeploy) {
   name: 'bastion-host-deployment'
   scope: rg
   params: {
