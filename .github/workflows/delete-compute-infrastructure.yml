@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install Azure CLI
-        uses: azure/setup-azd@v2.2.0
+        uses: azure/setup-azd@v2.2.1
 
       - name: Authenticate Azure CLI (Federated Credentials)
         run: |
