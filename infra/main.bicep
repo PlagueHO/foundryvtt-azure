@@ -159,7 +159,7 @@ var sendToLogAnalyticsName = 'send-to-loganalytics-${environmentName}'
 var sendToLogAnalytics = deployDiagnostics ? [
   {
     name: sendToLogAnalyticsName
-    workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    workspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
     logCategoriesAndGroups: [
       {
         categoryGroup: 'allLogs'
@@ -201,14 +201,14 @@ var subnets = [
     name: 'storage'
     addressPrefix: '10.0.1.0/24'
     privateEndpointNetworkPolicies: 'Disabled'
-    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupStorage.outputs.resourceId : null
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupStorage.?outputs.?resourceId ?? null : null
   }
   {
     // Key Vault Subnet (Key Vault private endpoints)
     name: 'keyVault'
     addressPrefix: '10.0.2.0/24'
     privateEndpointNetworkPolicies: 'Disabled'
-    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupKeyVault.outputs.resourceId : null
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupKeyVault.?outputs.?resourceId ?? null : null
   }
   {
     // Web App Subnet (App Service private endpoints)
@@ -216,7 +216,7 @@ var subnets = [
     name: 'webApp'
     addressPrefix: '10.0.3.0/24'
     delegation: 'Microsoft.Web/serverFarms'
-    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupWebApp.outputs.resourceId : null
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupWebApp.?outputs.?resourceId ?? null : null
   }
   {
     // Azure Bastion Subnet (Bastion Host)
@@ -282,7 +282,7 @@ module storageFilePrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8
     location: 'global'
     virtualNetworkLinks: [
       {
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+        virtualNetworkResourceId: virtualNetwork.?outputs.?resourceId ?? ''
         registrationEnabled: false
       }
     ]
@@ -298,7 +298,7 @@ module keyVaultPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0'
     location: 'global'
     virtualNetworkLinks: [
       {
-        virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+        virtualNetworkResourceId: virtualNetwork.?outputs.?resourceId ?? ''
         registrationEnabled: false
       }
     ]
@@ -327,12 +327,12 @@ var privateEndpoints = effectiveDeployNetworking ? [
       privateDnsZoneGroupConfigs: [
         {
           name: 'storagefiledns' // Name for this specific DNS zone config
-          privateDnsZoneResourceId: storageFilePrivateDnsZone.outputs.resourceId
+          privateDnsZoneResourceId: storageFilePrivateDnsZone.?outputs.?resourceId ?? ''
         }
       ]
     }
     service: 'file'
-    subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // Storage Subnet
+    subnetResourceId: virtualNetwork.?outputs.?subnetResourceIds[1] ?? '' // Storage Subnet
     tags: tags
   }
 ] : []
@@ -345,7 +345,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
     diagnosticSettings: deployDiagnostics ? [
       {
         name: sendToLogAnalyticsName
-        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        workspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
         metricCategories: []
       }
     ] : []
@@ -428,14 +428,14 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
     }
     privateEndpoints: effectiveDeployNetworking ? [
       {
-        subnetResourceId: virtualNetwork.outputs.subnetResourceIds[2] // Key Vault Subnet
+        subnetResourceId: virtualNetwork.?outputs.?subnetResourceIds[2] ?? '' // Key Vault Subnet
         service: 'vault' // Sub-resource for Key Vault
         privateDnsZoneGroup: {
           name: 'default' // Name for the Private DNS Zone Group
           privateDnsZoneGroupConfigs: [
             {
               name: 'keyvaultdns' // Name for this specific DNS zone config
-              privateDnsZoneResourceId: keyVaultPrivateDnsZone.outputs.resourceId
+              privateDnsZoneResourceId: keyVaultPrivateDnsZone.?outputs.?resourceId ?? ''
             }
           ]
         }
@@ -453,7 +453,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
       (computeService == 'Web App' ? [
         {
           roleDefinitionIdOrName: 'Key Vault Secrets User'
-          principalId: webAppFoundryVtt.outputs.?systemAssignedMIPrincipalId
+          principalId: webAppFoundryVtt.?outputs.?systemAssignedMIPrincipalId ?? ''
           principalType: 'ServicePrincipal'
         }
       ] : [])
@@ -474,7 +474,6 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.5.0' = if (computeServ
     tags: tags
     zoneRedundant: false
     diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
-
   }
 }
 
@@ -502,7 +501,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.19.4' = if (computeService
     managedIdentities: {
       systemAssigned: true
     }
-    serverFarmResourceId: appServicePlan.outputs.resourceId
+    serverFarmResourceId: appServicePlan.?outputs.?resourceId ?? ''
     siteConfig: {
       alwaysOn: true
       appSettings: [
@@ -561,11 +560,11 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.19.4' = if (computeService
       numberOfWorkers: 1
     }
     tags: tags
-    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
+    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.?outputs.?subnetResourceIds[3] ?? '' : null // Web App Subnet
     diagnosticSettings: deployDiagnostics ? [
       {
         name: sendToLogAnalyticsName
-        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        workspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
         logCategoriesAndGroups: [
           // Common App Service log categories
           { category: 'AppServiceHTTPLogs' }
@@ -588,7 +587,7 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.19.4' = if (computeService =
     diagnosticSettings: deployDiagnostics ? [
       {
         name: sendToLogAnalyticsName
-        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        workspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
         logCategoriesAndGroups: [
           { category: 'AppServiceHTTPLogs' }
           { category: 'AppServiceConsoleLogs' }
@@ -602,7 +601,7 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.19.4' = if (computeService =
     ] : []
     kind: 'app,linux,container'
     name: webAppDdbProxyName
-    serverFarmResourceId: appServicePlan.outputs.resourceId
+    serverFarmResourceId: appServicePlan.?outputs.?resourceId ?? ''
     siteConfig: {
       numberOfWorkers: 1
       linuxFxVersion: 'DOCKER|${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
@@ -630,7 +629,7 @@ module webAppDdbProxy 'br/public:avm/res/web/site:0.19.4' = if (computeService =
       healthCheckPath: '/ping' // Added health check path
     }
     tags: tags
-    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.outputs.subnetResourceIds[3] : null // Web App Subnet
+    virtualNetworkSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.?outputs.?subnetResourceIds[3] ?? '' : null // Web App Subnet
   }
 }
 
@@ -717,13 +716,13 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (effectiv
   params: {
     name: bastionHostName
     location: location
-    virtualNetworkResourceId: virtualNetwork.outputs.resourceId
+    virtualNetworkResourceId: virtualNetwork.?outputs.?resourceId ?? ''
     skuName: 'Developer' // Consider making this configurable or choosing based on needs
     tags: tags
     diagnosticSettings: deployDiagnostics ? [
       {
         name: sendToLogAnalyticsName
-        workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+        workspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
         logCategoriesAndGroups: [
           {
             category: 'BastionAuditLogs'
@@ -736,13 +735,13 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (effectiv
 }
 
 // WebApp Outputs
-output WEBAPP_FOUNDRY_VTT_URL string = computeService == 'Web App' ? webAppFoundryVtt.outputs.defaultHostname : ''
-output WEBAPP_DDBPROXY_URL string = computeService == 'Web App' && deployDdbProxy ? webAppDdbProxy.outputs.defaultHostname : ''
-output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Web App' ? webAppFoundryVtt.outputs.resourceId : ''
+output WEBAPP_FOUNDRY_VTT_URL string = computeService == 'Web App' ? webAppFoundryVtt.?outputs.?defaultHostname ?? '' : ''
+output WEBAPP_DDBPROXY_URL string = computeService == 'Web App' && deployDdbProxy ? webAppDdbProxy.?outputs.?defaultHostname ?? '' : ''
+output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Web App' ? webAppFoundryVtt.?outputs.?resourceId ?? '' : ''
 
 // Container Instance Outputs
-output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'Container Instance' ? containerGroup.outputs.iPv4Address : ''
-output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Container Instance' ? containerGroup.outputs.resourceId : ''
+output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'Container Instance' ? containerGroup.?outputs.?iPv4Address ?? '' : ''
+output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Container Instance' ? containerGroup.?outputs.?resourceId ?? '' : ''
 
 // Azure Container Apps Outputs
 // TBC
@@ -760,8 +759,8 @@ output KEY_VAULT_URI string = keyVault.outputs.uri
 output KEY_VAULT_RESOURCE_ID string = keyVault.outputs.resourceId
 
 // Log Analytics Outputs
-output LOG_ANALYTICS_WORKSPACE_NAME string = deployDiagnostics ? logAnalyticsWorkspace.outputs.name : ''
-output LOG_ANALYTICS_WORKSPACE_RESOURCE_ID string = deployDiagnostics ? logAnalyticsWorkspace.outputs.resourceId : ''
+output LOG_ANALYTICS_WORKSPACE_NAME string = deployDiagnostics ? logAnalyticsWorkspace.?outputs.?name ?? '' : ''
+output LOG_ANALYTICS_WORKSPACE_RESOURCE_ID string = deployDiagnostics ? logAnalyticsWorkspace.?outputs.?resourceId ?? '' : ''
 
 // Foundry VTT URL
-output FOUNDRY_VTT_URL string = computeService == 'Web App' ? 'https://${webAppFoundryVtt.outputs.defaultHostname}/' : (computeService == 'Container Instance' ? 'http://${containerGroup.outputs.iPv4Address}:30000/' : '')
+output FOUNDRY_VTT_URL string = computeService == 'Web App' ? 'https://${webAppFoundryVtt.?outputs.?defaultHostname ?? ''}/' : (computeService == 'Container Instance' ? 'http://${containerGroup.?outputs.?iPv4Address ?? ''}:30000/' : '')
