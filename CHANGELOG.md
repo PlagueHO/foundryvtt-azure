@@ -3,6 +3,19 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
+- Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
+- Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.
+
+### Changed
+
+- Updated `effectiveDeployNetworking` to enable VNet deployment for both Web App and Container App compute services.
+- Updated specification, AGENTS.md, and README.md to reflect three compute modes.
+
 ## [2.0.0] - 2025-05-24
 
 ### Changed

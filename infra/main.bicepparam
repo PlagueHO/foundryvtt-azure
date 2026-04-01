@@ -36,8 +36,8 @@ param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SK
 param containerInstanceCpu = int(readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2'))
 param containerInstanceMemoryInGB = readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB', '2')
 
-// Azure Contaier Apps Parameters (required when ComputeService is set to ContainerApps)
-// TBC
+// Container App Parameters (required when ComputeService is set to Container App)
+param containerAppMinReplicas = int(readEnvironmentVariable('AZURE_CONTAINER_APP_MIN_REPLICAS', '0'))
 
 // Deploy a DDB Proxy
 param deployDdbProxy = toLower(readEnvironmentVariable('AZURE_DEPLOY_DDB_PROXY', 'false')) == 'true' ? true : false

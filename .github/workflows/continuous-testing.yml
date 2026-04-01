@@ -58,5 +58,24 @@ jobs:
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
+  # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
+  test-container-app:
+    name: Test Container App Deployment
+    uses: ./.github/workflows/test-infrastructure.yml
+    needs:
+      - test-container-instance
+    with:
+      ENVIRONMENT: ContainerApp
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_ENV_NAME: ${{ format('fvtt-ca-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-ca-{0}-{1}', github.ref_name, github.run_id) }}
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
 
 

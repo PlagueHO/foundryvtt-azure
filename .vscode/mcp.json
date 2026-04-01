@@ -1,26 +1,33 @@
 {
-	"inputs": [],
-	"servers": {
-		"context7": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"@upstash/context7-mcp@latest"
-			]
-		},
-		"github": {
-			"url": "https://api.githubcopilot.com/mcp/",
-			"type": "http"
-		},
-		"playwright": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@playwright/mcp@latest"
-			],
-			"type": "stdio",
-			"env": {}
-		}
-	}
+  "inputs": [],
+  "servers": {
+    "azure-verified-module-bicep": {
+      "type": "sse",
+      "url": "https://gitmcp.io/Azure/bicep-registry-modules"
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "type": "http"
+    },
+    "github-agentic-workflows": {
+      "command": "gh",
+      "args": [
+        "aw",
+        "mcp-server"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    "microsoft-learn": {
+      "url": "https://learn.microsoft.com/api/mcp",
+      "type": "http"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
 }
