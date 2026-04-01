@@ -19,6 +19,11 @@ on:
         description: "The name of the Azure resource group to deploy the application resources to"
         required: false
         type: string
+      AZURE_APP_SERVICE_PLAN_SKUNAME:
+        description: "The App Service Plan SKU name to use for the Web App compute service"
+        required: false
+        type: string
+        default: 'S1'
 
     secrets:
       AZURE_TENANT_ID:
@@ -63,7 +68,7 @@ jobs:
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
 
       # Environment variables for azd
-      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ vars.AZURE_APP_SERVICE_PLAN_SKUNAME || 'S1' }}
+      AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
       AZURE_COMPUTE_SERVICE: ${{ vars.AZURE_COMPUTE_SERVICE }}
       AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
       AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
