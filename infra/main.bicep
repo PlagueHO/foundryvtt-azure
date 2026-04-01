@@ -798,7 +798,7 @@ module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.21.0' = if 
         name: 'foundryvtt'
         image: '${foundryVttDockerImageName}:${foundryVttDockerImageTag}'
         resources: {
-          cpu: '1'
+          cpu: 1
           memory: '2Gi'
         }
         env: [
@@ -862,6 +862,7 @@ module containerAppDdbProxy 'br/public:avm/res/app/container-app:0.21.0' = if (c
         name: 'ddbproxy'
         image: '${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
         resources: {
+          #disable-next-line BCP036
           cpu: '0.25'
           memory: '0.5Gi'
         }

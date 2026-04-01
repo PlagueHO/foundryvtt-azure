@@ -33,11 +33,11 @@ param storageResourceLockEnabled = toLower(readEnvironmentVariable('AZURE_STORAG
 param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SKUNAME', 'P0v3')
 
 // Container Instance Parameters (required when ComputeService is set to ContainerInstance)
-param containerInstanceCpu = int(readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2'))
+param containerInstanceCpu = int(empty(readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2')) ? '2' : readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2'))
 param containerInstanceMemoryInGB = readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB', '2')
 
 // Container App Parameters (required when ComputeService is set to Container App)
-param containerAppMinReplicas = int(readEnvironmentVariable('AZURE_CONTAINER_APP_MIN_REPLICAS', '0'))
+param containerAppMinReplicas = int(empty(readEnvironmentVariable('AZURE_CONTAINER_APP_MIN_REPLICAS', '0')) ? '0' : readEnvironmentVariable('AZURE_CONTAINER_APP_MIN_REPLICAS', '0'))
 
 // Deploy a DDB Proxy
 param deployDdbProxy = toLower(readEnvironmentVariable('AZURE_DEPLOY_DDB_PROXY', 'false')) == 'true' ? true : false
