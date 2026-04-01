@@ -80,7 +80,7 @@ azd env set AZURE_DEPLOY_DIAGNOSTICS "true"
 ```
 
 ```sh
-# Standard Web App deployment (defaults: networking enabled, SKU P0v3)
+# Standard Web App deployment (defaults: networking enabled, SKU S1)
 azd env set AZURE_COMPUTE_SERVICE "Web App"
 ```
 
@@ -93,7 +93,7 @@ azd env set AZURE_DEPLOY_NETWORKING "false"
 ```sh
 # Web App on premium plan (higher SKU)
 azd env set AZURE_COMPUTE_SERVICE "Web App"
-azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P1v3"
+azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3"
 ```
 
 ```sh

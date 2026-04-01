@@ -125,12 +125,15 @@
     },
     "appServicePlanSkuName": {
       "type": "string",
-      "defaultValue": "P0v3",
+      "defaultValue": "S1",
       "allowedValues": [
         "F1",
         "B1",
         "B2",
         "B3",
+        "S1",
+        "S2",
+        "S3",
         "P1v2",
         "P2v2",
         "P3v2",
