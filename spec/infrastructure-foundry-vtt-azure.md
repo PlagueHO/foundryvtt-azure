@@ -15,6 +15,7 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 |------|------------|
 | FVTT | Foundry Virtual Table Top |
 | AVM | Azure Verified Module |
+| ACA | Azure Container Apps |
 | ACI | Azure Container Instance |
 | Web App | Azure App Service (Linux Container) |
 | VNet | Virtual Network |
@@ -25,13 +26,13 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 ## 3. Requirements, Constraints & Guidelines
 
 - **R-1**: Deployment must succeed via `azd up` using `infra/main.bicep` without manual pre-reqs beyond azd login.  
-- **R-2**: Support two compute modes: `Web App` (default) and `Container Instance`.  
+- **R-2**: Support three compute modes: `Web App` (default), `Container Instance`, and `Container App`.  
 - **R-3**: All resources share a common *environment name* to guarantee global uniqueness.  
-- **R-4**: When `computeService == 'Web App'` and `deployNetworking == true`, resources MUST be isolated in a VNet with PEs for Storage and KV.  
-- **R-5**: All secrets (storage key, Foundry credentials) MUST reside in KV; Web App MSI granted **Key Vault Secrets User**.  
-- **R-6**: Storage account name ≤ 24 lower-case alphanumerics and may be locked (`CanNotDelete`) when `storageResourceLockEnabled == true`.  
-- **C-1**: Container Apps is out-of-scope until AVM support exists.  
-- **C-2**: ACI deployments cannot use VNets (Azure limitation).  
+- **R-4**: When `computeService == 'Web App'` or `computeService == 'Container App'` and `deployNetworking == true`, resources MUST be isolated in a VNet with PEs for Storage and KV.
+- **R-5**: All secrets (storage key, Foundry credentials) MUST reside in KV; Web App and Container App MSI granted **Key Vault Secrets User**.
+- **R-6**: Storage account name ≤ 24 lower-case alphanumerics and may be locked (`CanNotDelete`) when `storageResourceLockEnabled == true`.
+- **R-7**: Container App deployments MUST use a Consumption workload profile and support scale-to-zero (`minReplicas: 0`).
+- **C-1**: ACI deployments cannot use VNets (Azure limitation).
 - **G-1**: Use AVM modules (`br/public:avm/*`) for all Azure resources.  
 - **G-2**: Tags must at minimum include `azd-env-name`.  
 - **G-3**: Optional components (Bastion, DDB-Proxy, diagnostics) are toggled via boolean parameters.
@@ -44,7 +45,7 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 |------|------|---------|-------------|
 | `environmentName` | string | — | Globally unique env prefix |
 | `location` | string | — | Azure region |
-| `computeService` | string | `'Web App'` | `Web App` \| `Container Instance` |
+| `computeService` | string | `'Web App'` | `Web App` \| `Container Instance` \| `Container App` |
 | `deployNetworking` | bool | `true` | VNet & PEs for Web App |
 | `foundryUsername` / `foundryPassword` / `foundryAdminKey` | secure string | — | Foundry VTT creds |
 
@@ -102,13 +103,33 @@ azd env set AZURE_DEPLOY_DDB_PROXY "true"
 azd env set AZURE_BASTION_HOST_DEPLOY "true"
 ```
 
+```sh
+# Container App with scale-to-zero (lowest cost)
+azd env set AZURE_COMPUTE_SERVICE "Container App"
+azd env set AZURE_CONTAINER_APP_MIN_REPLICAS "0"
+```
+
+```sh
+# Container App with DDB-Proxy and diagnostics
+azd env set AZURE_COMPUTE_SERVICE "Container App"
+azd env set AZURE_DEPLOY_DDB_PROXY "true"
+azd env set AZURE_DEPLOY_DIAGNOSTICS "true"
+```
+
+```sh
+# Container App without networking (public endpoints)
+azd env set AZURE_COMPUTE_SERVICE "Container App"
+azd env set AZURE_DEPLOY_NETWORKING "false"
+```
+
 ## 7. Validation Criteria
 
-1. `azd up` completes with zero errors in both compute modes.  
-1. URL in output responds with HTTP 200.  
-1. KV contains four secrets; Web App MSI can read them.  
-1. If `deployNetworking == true`, public network access on Storage and KV is **Disabled**.  
+1. `azd up` completes with zero errors in all three compute modes.
+1. URL in output responds with HTTP 200.
+1. KV contains four secrets; Web App and Container App MSI can read them.
+1. If `deployNetworking == true`, public network access on Storage and KV is **Disabled**.
 1. GitHub Actions workflow passes using Workload Identity Federation.
+1. Container App scales to zero replicas when idle (`containerAppMinReplicas == 0`).
 
 ## 8. Related Specifications / Further Reading
 

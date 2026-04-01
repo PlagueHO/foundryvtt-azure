@@ -71,6 +71,7 @@ jobs:
       AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
       AZURE_CONTAINER_INSTANCE_CPU: ${{ vars.AZURE_CONTAINER_INSTANCE_CPU }}
       AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB: ${{ vars.AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB }}
+      AZURE_CONTAINER_APP_MIN_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MIN_REPLICAS }}
       AZURE_STORAGE_PUBLIC_ACCESS: ${{ vars.AZURE_STORAGE_PUBLIC_ACCESS }}
 
     environment: ${{ inputs.ENVIRONMENT }}
@@ -92,8 +93,8 @@ jobs:
         shell: pwsh
 
       - name: Provision Infrastructure
-        run: azd provision --no-prompt --debug
+        run: azd provision --no-prompt
           
       - name: Delete Infrastructure
         if: always()
-        run: azd down --no-prompt --purge --force --debug
+        run: azd down --no-prompt --purge --force

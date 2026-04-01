@@ -46,31 +46,29 @@ You can choose which Azure compute service to use for running Foundry VTT by set
 
 - **Web App** (default): Deploys Foundry VTT as a Linux container in Azure App Service. This option deploys into a virtual network by default. Recommended for most users.
 - **Container Instance**: Deploys Foundry VTT in an Azure Container Instance. Useful for lightweight or temporary workloads. This option does not support deploying into a virtual network.
-- **Container Apps**: Not currently supported, but may be added in the future.
+- **Container App**: Deploys Foundry VTT in Azure Container Apps with scale-to-zero support. Useful for cost-optimized deployments where the server is not always in use. Supports virtual network deployment.
 
 Set the compute service using:
 
 ```sh
-azd env set AZURE_COMPUTE_SERVICE "Web App" # or "Container Instance"
+azd env set AZURE_COMPUTE_SERVICE "Web App" # or "Container Instance" or "Container App"
 ```
 
 ### Feature Comparison
 
-| Feature                        | Web App (Default, Recommended)        | Container Instance                             | Container Apps (Future)     |
-| ------------------------------ | ------------------------------------- | ---------------------------------------------- | --------------------------- |
-| **Description**                | Azure App Service                     | Azure Container Instance                       | Azure Container Apps        |
-| **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`                    | `felddy/foundryvtt:release` |  
-| **Persistent Data**            | Azure Files                           | Azure Files                                    | Azure Files                 |
-| **Storage Account Access**     | Private VNET, Public Optional         | Public Only                                    | TBC                         |
-| **DDB-Proxy Support**          | Yes (optional)                        | No                                             | TBC                         |
-| **DDB-Proxy Docker Image**     | `ghcr.io/mrprimate/ddb-proxy:release` | N/A                                            | TBC                         |
-| **Virtual Network Deployment** | Yes (default, enhances security)      | No                                             | TBC                         |
-| **Current Status**             | Operational                           | Limited                                        | TBC                         |
-| **URL**                        | https://<env>.azurewebsites.net       | http://<env>.<region>.azurecontainer.io:30000/ | TBC                         |
-| **Secrets Stored**             | Azure Key Vault                       | In service                                     | TBC                         |
-
-> [!NOTE]
-> The ContainerApps option is not currently available, but should be added in the future. If you are interested in this option, please open an issue on the [GitHub repository](https://github.com/PlagueHO/foundryvtt-azure/issues).
+| Feature                        | Web App (Default, Recommended)        | Container Instance                             | Container App                                   |
+| ------------------------------ | ------------------------------------- | ---------------------------------------------- | ----------------------------------------------- |
+| **Description**                | Azure App Service                     | Azure Container Instance                       | Azure Container Apps                            |
+| **Docker Image**               | `felddy/foundryvtt:release`           | `felddy/foundryvtt:release`                    | `felddy/foundryvtt:release`                     |
+| **Persistent Data**            | Azure Files                           | Azure Files                                    | Azure Files                                     |
+| **Storage Account Access**     | Private VNET, Public Optional         | Public Only                                    | Private VNET, Public Optional                   |
+| **DDB-Proxy Support**          | Yes (optional)                        | No                                             | Yes (optional)                                  |
+| **DDB-Proxy Docker Image**     | `ghcr.io/mrprimate/ddb-proxy:release` | N/A                                            | `ghcr.io/mrprimate/ddb-proxy:latest`            |
+| **Virtual Network Deployment** | Yes (default, enhances security)      | No                                             | Yes (default, enhances security)                |
+| **Scale to Zero**              | No                                    | No                                             | Yes (default)                                   |
+| **Current Status**             | Operational                           | Limited                                        | Operational                                     |
+| **URL**                        | https://<env>.azurewebsites.net       | http://<env>.<region>.azurecontainer.io:30000/ | https://<env>.<region>.azurecontainerapps.io    |
+| **Secrets Stored**             | Azure Key Vault                       | In service                                     | Azure Key Vault                                 |
 
 ---
 
@@ -110,12 +108,13 @@ azd env set AZURE_LOCATION "EastUS2"
 azd env set FOUNDRY_DOCKER_IMAGE_TAG "release" # Docker tag for felddy/foundryvtt - Defaults to `release` but allows you to specify a different tag if needed
 azd env set AZURE_DEPLOY_NETWORKING "true" # "false" to deploy without a virtual network
 azd env set AZURE_STORAGE_CONFIGURATION "Premium_100GB" # or "Standard_100GB"
-azd env set AZURE_COMPUTE_SERVICE "Web App" # or "ContainerInstance"
+azd env set AZURE_COMPUTE_SERVICE "Web App" # or "ContainerInstance" or "Container App"
 azd env set AZURE_APP_SERVICE_PLAN_SKUNAME "P0v3" # Only for Web App
 azd env set AZURE_CONTAINER_INSTANCE_CPU "2" # Only for Container Instance, from 1 to 4
 azd env set AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB "2" # Only for Container Instance, from 1 to 16
-azd env set AZURE_DEPLOY_DDB_PROXY "false" # Only for Web App
-azd env set AZURE_BASTION_HOST_DEPLOY "false" # Only for Web App and when deploying networking
+azd env set AZURE_CONTAINER_APP_MIN_REPLICAS "0" # Only for Container App, 0 or 1 (0 enables scale-to-zero)
+azd env set AZURE_DEPLOY_DDB_PROXY "false" # Only for Web App and Container App
+azd env set AZURE_BASTION_HOST_DEPLOY "false" # Only for Web App and Container App when deploying networking
 azd env set AZURE_DEPLOY_DIAGNOSTICS "false"
 ```
 
@@ -146,7 +145,7 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_LOCATION`: Azure region for deployment.
 - `AZURE_PRINCIPAL_ID`: User or service principal ID for role assignments (provided automatically by azd).
 - `AZURE_PRINCIPAL_ID_TYPE`: `User` or `ServicePrincipal`. This is the tyoe of principal that will be used for role assignments. Default is `User`. It should be changed to `ServicePrincipal` if you are using a service principal (for example, when deploying via a GitHub Actions workflow).
-- `AZURE_COMPUTE_SERVICE`: `Web App` or `Container Instance` (controls the compute service used for Foundry VTT).
+- `AZURE_COMPUTE_SERVICE`: `Web App`, `Container Instance`, or `Container App` (controls the compute service used for Foundry VTT).
 - `AZURE_DEPLOY_NETWORKING`: `true` or `false` to deploy a virtual network with services added into the network. Default is `true`.
 - `AZURE_STORAGE_CONFIGURATION`: `Premium_100GB` or `Standard_100GB`. Default is `Premium_100GB`.
 - `AZURE_STORAGE_PUBLIC_ACCESS`: To allow public access to the storage account. Default is `false`.
@@ -154,7 +153,8 @@ You can control deployment by setting environment variables before running `azd 
 - `AZURE_APP_SERVICE_PLAN_SKUNAME`: App Service SKU (e.g., `P1v2`). Default is `P0v3`.
 - `AZURE_CONTAINER_INSTANCE_CPU`: CPU count for Container Instance, from `1` to `4`. Default is `2`.
 - `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB`: Memory (GB) for Container Instance, from `1` to `16`. Default is `2`.
-- `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy.
+- `AZURE_CONTAINER_APP_MIN_REPLICAS`: Minimum number of replicas for Container App, `0` or `1`. Default is `0` (enables scale-to-zero). Maximum replicas is always `1`.
+- `AZURE_DEPLOY_DDB_PROXY`: `true` or `false` to deploy DDB-Proxy. Supported for Web App and Container App.
 - `AZURE_BASTION_HOST_DEPLOY`: `true` or `false` to deploy Azure Bastion.
 - `AZURE_DEPLOY_DIAGNOSTICS`: `true` or `false` to deploy a Log Analytics workspace and send resource diagnostics to it. Default is `false`.
 - `FOUNDRY_DOCKER_IMAGE_TAG`: Docker image tag for the `felddy/foundryvtt` container. Default: `release`.
@@ -205,18 +205,21 @@ For more information on how to use the DDB-Proxy with Foundry VTT, please see th
 
 The following table summarizes which Azure resources are deployed for each compute service option:
 
-| Resource                                             | Web App (Default, Recommended) | Container Instance           |
-|------------------------------------------------------|--------------------------------|------------------------------|
-| **Azure Resource Group**                             | ✔️                             | ✔️                          |
-| **Virtual Network**                                  | ✔️ (default)                   | Not supported                |
-| **Azure Storage Account (Azure Files)**              | ✔️                             | ✔️                          |
-| **Azure Key Vault**                                  | ✔️                             | ✔️ (not used)               |
-| **Azure Web App (Foundry VTT container)**            | ✔️                             | N/A                          |
-| **Azure Web App (DDB-Proxy)**                        | ✔️ (optional)                  | N/A                          |
-| **Azure Container Instance (Foundry VTT container)** | N/A                            | ✔️                           |
-| **Azure Container Instance (DDB-Proxy)**             | N/A                            | Not supported                |
-| **Azure Bastion**                                    | Optional                       | Not supported                |
-| **Azure Log Analytics Workspace**                    | Optional                       | Optional                     |
+| Resource                                             | Web App (Default, Recommended) | Container Instance           | Container App                |
+|------------------------------------------------------|--------------------------------|------------------------------|------------------------------|
+| **Azure Resource Group**                             | ✔️                             | ✔️                          | ✔️                          |
+| **Virtual Network**                                  | ✔️ (default)                   | Not supported                | ✔️ (default)                 |
+| **Azure Storage Account (Azure Files)**              | ✔️                             | ✔️                          | ✔️                          |
+| **Azure Key Vault**                                  | ✔️                             | ✔️ (not used)               | ✔️                          |
+| **Azure Web App (Foundry VTT container)**            | ✔️                             | N/A                          | N/A                          |
+| **Azure Web App (DDB-Proxy)**                        | ✔️ (optional)                  | N/A                          | N/A                          |
+| **Azure Container Instance (Foundry VTT container)** | N/A                            | ✔️                           | N/A                          |
+| **Azure Container Instance (DDB-Proxy)**             | N/A                            | Not supported                | N/A                          |
+| **Azure Container Apps Environment**                 | N/A                            | N/A                          | ✔️                          |
+| **Azure Container App (Foundry VTT)**                | N/A                            | N/A                          | ✔️                          |
+| **Azure Container App (DDB-Proxy)**                  | N/A                            | N/A                          | ✔️ (optional)               |
+| **Azure Bastion**                                    | Optional                       | Not supported                | Optional                     |
+| **Azure Log Analytics Workspace**                    | Optional                       | Optional                     | Optional                     |
 
 > [!NOTE]
 > [Soft-delete](https://learn.microsoft.com/azure/key-vault/general/soft-delete-overview) is not enabled for the Key Vault by default as it doesn't contain any secrets that can't be easily recreated by redeploying the solution.

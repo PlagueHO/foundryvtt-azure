@@ -73,7 +73,7 @@ param storageResourceLockEnabled bool = false
 @allowed([
   'Web App'
   'Container Instance'
-  // 'Container App' - not supported yet
+  'Container App'
 ])
 param computeService string = 'Web App'
 
@@ -109,8 +109,11 @@ param containerInstanceCpu int = 2
 @allowed(['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13', '13.5', '14', '14.5', '15', '15.5', '16'])
 param containerInstanceMemoryInGB string = '2'
 
-// Azure Contaier Apps Parameters (required when ComputeService is set to ContainerApps)
-// TBC
+// Container App Parameters (required when ComputeService is set to Container App)
+@sys.description('The minimum number of replicas for the Azure Container App. Set to 0 to enable scale-to-zero. Only used when deploying into an Azure Container App.')
+@minValue(0)
+@maxValue(1)
+param containerAppMinReplicas int = 0
 
 // Deploy a DDB Proxy
 @sys.description('Deploy a D&D Beyond proxy into the app service plan.')
@@ -138,6 +141,9 @@ var appServicePlanName string = take('${abbrs.webSitesAppService}${environmentNa
 var webAppFoundryVttName string = environmentName
 var webAppDdbProxyName string = '${environmentName}ddbproxy'
 var containerInstanceFoundryVttName string = '${abbrs.containerInstanceContainerGroups}${environmentName}'
+var containerAppEnvironmentName string = '${abbrs.appManagedEnvironments}${environmentName}'
+var containerAppFoundryVttName string = '${abbrs.appContainerApps}${environmentName}'
+var containerAppDdbProxyName string = '${abbrs.appContainerApps}${environmentName}ddbproxy'
 var bastionHostName string = '${abbrs.networkBastionHosts}${environmentName}'
 var keyVaultPrivateDnsZoneName = 'privatelink.vaultcore.azure.net'
 var logAnalyticsWorkspaceName = take('${abbrs.operationalInsightsWorkspaces}${environmentName}', 63)
@@ -148,6 +154,9 @@ var storageAccountKeySecretName = 'storageAccountKey'
 var foundryUsernameSecretName   = 'foundryUsername'
 var foundryPasswordSecretName   = 'foundryPassword'
 var foundryAdminKeySecretName   = 'foundryAdminKey'
+
+// Key Vault URI constructed from name (avoids circular dependency with Container App modules)
+var keyVaultUri string = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/'
 
 // Docker image names
 var foundryVttDockerImageName string = 'felddy/foundryvtt'
@@ -169,7 +178,7 @@ var sendToLogAnalytics = deployDiagnostics ? [
   }
 ] : []
 
-var effectiveDeployNetworking = deployNetworking && computeService == 'Web App' // Only deploy networking if using Web App
+var effectiveDeployNetworking = deployNetworking && (computeService == 'Web App' || computeService == 'Container App') // Deploy networking if using Web App or Container App
 
 // ---------- RESOURCE GROUP ----------
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -219,6 +228,13 @@ var subnets = [
     networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupWebApp.?outputs.?resourceId ?? null : null
   }
   {
+    // Container Apps Subnet (Container Apps Environment infrastructure)
+    // Only used when deploying into Azure Container Apps with networking
+    name: 'containerApps'
+    addressPrefix: '10.0.4.0/23' // /23 required by Container Apps Environment
+    networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupContainerApps.?outputs.?resourceId ?? null : null
+  }
+  {
     // Azure Bastion Subnet (Bastion Host)
     // Only used when deploying an Azure Bastion Host with networking
     name: 'AzureBastionSubnet'
@@ -231,6 +247,17 @@ module networkSecurityGroupWebApp 'br/public:avm/res/network/network-security-gr
   scope: rg
   params: {
     name: take('${abbrs.networkNetworkSecurityGroups}${environmentName}-webApp' ,60)
+    location: location
+    securityRules: []
+    tags: tags
+  }
+}
+
+module networkSecurityGroupContainerApps 'br/public:avm/res/network/network-security-group:0.5.3' = if (effectiveDeployNetworking) {
+  name: 'network-security-group-container-apps-deployment'
+  scope: rg
+  params: {
+    name: take('${abbrs.networkNetworkSecurityGroups}${environmentName}-containerApps', 60)
     location: location
     securityRules: []
     tags: tags
@@ -454,6 +481,13 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
         {
           roleDefinitionIdOrName: 'Key Vault Secrets User'
           principalId: webAppFoundryVtt.?outputs.?systemAssignedMIPrincipalId ?? ''
+          principalType: 'ServicePrincipal'
+        }
+      ] : []),
+      (computeService == 'Container App' ? [
+        {
+          roleDefinitionIdOrName: 'Key Vault Secrets User'
+          principalId: containerAppFoundryVtt.?outputs.?systemAssignedMIPrincipalId ?? ''
           principalType: 'ServicePrincipal'
         }
       ] : [])
@@ -709,6 +743,146 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.
 
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
+// ------------- CONTAINER APPS ENVIRONMENT (IF COMPUTE SERVICE IS CONTAINER APP) -------------
+module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.0' = if (computeService == 'Container App') {
+  name: 'container-app-environment-deployment'
+  scope: rg
+  dependsOn: [
+    storageAccount
+  ]
+  params: {
+    name: containerAppEnvironmentName
+    location: location
+    tags: tags
+    zoneRedundant: false
+    internal: false // External access (public FQDN)
+    infrastructureSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.?outputs.?subnetResourceIds[5] ?? '' : '' // Container Apps subnet
+    appLogsConfiguration: deployDiagnostics ? {
+      destination: 'log-analytics'
+      logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
+    } : {
+      destination: 'azure-monitor'
+    }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
+    storages: [
+      {
+        name: 'foundryvttdata'
+        kind: 'SMB'
+        accessMode: 'ReadWrite'
+        storageAccountName: storageAccountName
+      }
+    ]
+    publicNetworkAccess: 'Enabled' // Must be enabled for external ingress
+  }
+}
+
+module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.21.0' = if (computeService == 'Container App') {
+  name: 'container-app-foundry-vtt-deployment'
+  scope: rg
+  params: {
+    name: containerAppFoundryVttName
+    environmentResourceId: containerAppEnvironment.?outputs.?resourceId ?? ''
+    location: location
+    tags: tags
+    workloadProfileName: 'Consumption'
+    managedIdentities: {
+      systemAssigned: true
+    }
+    containers: [
+      {
+        name: 'foundryvtt'
+        image: '${foundryVttDockerImageName}:${foundryVttDockerImageTag}'
+        resources: {
+          cpu: '1'
+          memory: '2Gi'
+        }
+        env: [
+          { name: 'FOUNDRY_USERNAME', secretRef: 'foundry-username' }
+          { name: 'FOUNDRY_PASSWORD', secretRef: 'foundry-password' }
+          { name: 'FOUNDRY_ADMIN_KEY', secretRef: 'foundry-admin-key' }
+          { name: 'FOUNDRY_MINIFY_STATIC_FILES', value: 'true' }
+        ]
+        volumeMounts: [
+          { volumeName: 'foundrydata', mountPath: '/data' }
+        ]
+      }
+    ]
+    volumes: [
+      {
+        name: 'foundrydata'
+        storageName: 'foundryvttdata'
+        storageType: 'AzureFile'
+      }
+    ]
+    secrets: [
+      {
+        name: 'foundry-username'
+        keyVaultUrl: '${keyVaultUri}secrets/${foundryUsernameSecretName}'
+        identity: 'system'
+      }
+      {
+        name: 'foundry-password'
+        keyVaultUrl: '${keyVaultUri}secrets/${foundryPasswordSecretName}'
+        identity: 'system'
+      }
+      {
+        name: 'foundry-admin-key'
+        keyVaultUrl: '${keyVaultUri}secrets/${foundryAdminKeySecretName}'
+        identity: 'system'
+      }
+    ]
+    ingressExternal: true
+    ingressTargetPort: 30000
+    ingressTransport: 'auto'
+    ingressAllowInsecure: false
+    scaleSettings: {
+      minReplicas: containerAppMinReplicas
+      maxReplicas: 1
+    }
+    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
+  }
+}
+
+module containerAppDdbProxy 'br/public:avm/res/app/container-app:0.21.0' = if (computeService == 'Container App' && deployDdbProxy) {
+  name: 'container-app-ddbproxy-deployment'
+  scope: rg
+  params: {
+    name: containerAppDdbProxyName
+    environmentResourceId: containerAppEnvironment.?outputs.?resourceId ?? ''
+    location: location
+    tags: tags
+    workloadProfileName: 'Consumption'
+    containers: [
+      {
+        name: 'ddbproxy'
+        image: '${ddbProxyDockerImageName}:${ddbProxyDockerImageTag}'
+        resources: {
+          cpu: '0.25'
+          memory: '0.5Gi'
+        }
+        env: [
+          { name: 'VIRTUAL_HOST', value: containerAppFoundryVttName }
+          { name: 'VIRTUAL_PORT', value: '3000' }
+        ]
+      }
+    ]
+    ingressExternal: true
+    ingressTargetPort: 3000
+    ingressTransport: 'auto'
+    ingressAllowInsecure: false
+    scaleSettings: {
+      minReplicas: containerAppMinReplicas
+      maxReplicas: 1
+    }
+    diagnosticSettings: deployDiagnostics ? sendToLogAnalytics : []
+  }
+}
+
 // ------------- BASTION HOST (OPTIONAL) -------------
 module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (effectiveDeployNetworking && bastionHostDeploy) {
   name: 'bastion-host-deployment'
@@ -743,8 +917,10 @@ output WEBAPP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Web App' ? web
 output CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS string = computeService == 'Container Instance' ? containerGroup.?outputs.?iPv4Address ?? '' : ''
 output CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Container Instance' ? containerGroup.?outputs.?resourceId ?? '' : ''
 
-// Azure Container Apps Outputs
-// TBC
+// Container App Outputs
+output CONTAINER_APP_FOUNDRY_VTT_FQDN string = computeService == 'Container App' ? containerAppFoundryVtt.?outputs.?fqdn ?? '' : ''
+output CONTAINER_APP_FOUNDRY_VTT_RESOURCE_ID string = computeService == 'Container App' ? containerAppFoundryVtt.?outputs.?resourceId ?? '' : ''
+output CONTAINER_APP_DDBPROXY_FQDN string = computeService == 'Container App' && deployDdbProxy ? containerAppDdbProxy.?outputs.?fqdn ?? '' : ''
 
 // General Outputs
 output AZURE_ENV_NAME string = environmentName
@@ -763,4 +939,4 @@ output LOG_ANALYTICS_WORKSPACE_NAME string = deployDiagnostics ? logAnalyticsWor
 output LOG_ANALYTICS_WORKSPACE_RESOURCE_ID string = deployDiagnostics ? logAnalyticsWorkspace.?outputs.?resourceId ?? '' : ''
 
 // Foundry VTT URL
-output FOUNDRY_VTT_URL string = computeService == 'Web App' ? 'https://${webAppFoundryVtt.?outputs.?defaultHostname ?? ''}/' : (computeService == 'Container Instance' ? 'http://${containerGroup.?outputs.?iPv4Address ?? ''}:30000/' : '')
+output FOUNDRY_VTT_URL string = computeService == 'Web App' ? 'https://${webAppFoundryVtt.?outputs.?defaultHostname ?? ''}/' : (computeService == 'Container App' ? 'https://${containerAppFoundryVtt.?outputs.?fqdn ?? ''}/' : (computeService == 'Container Instance' ? 'http://${containerGroup.?outputs.?iPv4Address ?? ''}:30000/' : ''))
