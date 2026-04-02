@@ -24,6 +24,11 @@ on:
         required: false
         type: string
         default: 'P0v3'
+      ALLOW_STORAGE_POLICY_403_FORBIDDEN:
+        description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
+        required: false
+        type: boolean
+        default: false
 
     secrets:
       AZURE_TENANT_ID:
@@ -98,7 +103,22 @@ jobs:
         shell: pwsh
 
       - name: Provision Infrastructure
-        run: azd provision --no-prompt
+        shell: pwsh
+        run: |
+          $provisionOutput = & azd provision --no-prompt 2>&1 | Out-String
+          $provisionExitCode = $LASTEXITCODE
+
+          if ($provisionExitCode -ne 0) {
+            $allow403Forbidden = '${{ inputs.ALLOW_STORAGE_POLICY_403_FORBIDDEN }}' -eq 'true'
+            $containsForbidden = $provisionOutput -match '\(403\) Forbidden\.'
+
+            if ($allow403Forbidden -and $containsForbidden) {
+              Write-Warning "azd provision failed with '(403) Forbidden.' Continuing because this is most likely caused by a policy preventing storage accounts with public endpoints."
+            } else {
+              Write-Host $provisionOutput
+              exit $provisionExitCode
+            }
+          }
           
       - name: Delete Infrastructure
         if: always()
