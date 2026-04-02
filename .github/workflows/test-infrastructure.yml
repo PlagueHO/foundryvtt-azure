@@ -8,8 +8,8 @@ on:
         required: true
         type: string
       AZURE_LOCATION:
-        description: "The Azure region to deploy the application resources to"
-        required: true
+        description: "The Azure region to deploy the application resources to. If not provided, falls back to the AZURE_LOCATION environment variable in the target environment."
+        required: false
         type: string
       AZURE_ENV_NAME:
         description: "The name of the Azure environment"

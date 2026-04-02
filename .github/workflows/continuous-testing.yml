@@ -28,7 +28,6 @@ jobs:
       - lint-and-publish-bicep
     with:
       ENVIRONMENT: WebApp
-      AZURE_LOCATION: 'NewZealandNorth'
       AZURE_ENV_NAME: ${{ format('fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-webapp-{0}-{1}', github.ref_name, github.run_id) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
