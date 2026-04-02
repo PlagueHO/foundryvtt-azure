@@ -117,7 +117,7 @@ jobs:
             if ($allow403Forbidden -and $containsForbidden) {
               Write-Warning "azd provision failed with '(403) Forbidden.' Continuing because this is most likely caused by a policy preventing storage accounts with public endpoints."
             } else {
-              Write-Host $provisionText
+              Write-Error "azd provision failed with exit code $provisionExitCode. See provision output above."
               exit $provisionExitCode
             }
           }
