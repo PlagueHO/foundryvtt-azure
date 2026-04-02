@@ -10,7 +10,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "4314780024136940391"
+      "templateHash": "18304084622092719646"
     }
   },
   "parameters": {
@@ -6240,6 +6240,7 @@
               {
                 "name": "containerApps",
                 "addressPrefix": "10.0.4.0/23",
+                "delegation": "Microsoft.App/environments",
                 "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(reference('networkSecurityGroupContainerApps'), 'outputs'), 'resourceId'), 'value'), null()), null())]"
               },
               {
@@ -53878,7 +53879,7 @@
           "internal": {
             "value": false
           },
-          "infrastructureSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 5), '')), createObject('value', ''))]",
+          "infrastructureSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 4), '')), createObject('value', ''))]",
           "appLogsConfiguration": "[if(parameters('deployDiagnostics'), createObject('value', createObject('destination', 'log-analytics', 'logAnalyticsWorkspaceResourceId', coalesce(tryGet(tryGet(tryGet(reference('logAnalyticsWorkspace'), 'outputs'), 'resourceId'), 'value'), ''))), createObject('value', createObject('destination', 'azure-monitor')))]",
           "workloadProfiles": {
             "value": [

@@ -105,17 +105,19 @@ jobs:
       - name: Provision Infrastructure
         shell: pwsh
         run: |
-          $provisionOutput = & azd provision --no-prompt 2>&1 | Out-String
+          # Stream output to logs while also capturing it for targeted failure handling.
+          & azd provision --no-prompt 2>&1 | Tee-Object -Variable provisionOutput
           $provisionExitCode = $LASTEXITCODE
+          $provisionText = $provisionOutput | Out-String
 
           if ($provisionExitCode -ne 0) {
             $allow403Forbidden = '${{ inputs.ALLOW_STORAGE_POLICY_403_FORBIDDEN }}' -eq 'true'
-            $containsForbidden = $provisionOutput -match '\(403\) Forbidden\.'
+            $containsForbidden = $provisionText -match '\(403\) Forbidden\.'
 
             if ($allow403Forbidden -and $containsForbidden) {
               Write-Warning "azd provision failed with '(403) Forbidden.' Continuing because this is most likely caused by a policy preventing storage accounts with public endpoints."
             } else {
-              Write-Host $provisionOutput
+              Write-Host $provisionText
               exit $provisionExitCode
             }
           }

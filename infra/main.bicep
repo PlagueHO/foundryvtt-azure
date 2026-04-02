@@ -235,6 +235,7 @@ var subnets = [
     // Only used when deploying into Azure Container Apps with networking
     name: 'containerApps'
     addressPrefix: '10.0.4.0/23' // /23 required by Container Apps Environment
+    delegation: 'Microsoft.App/environments'
     networkSecurityGroupResourceId: effectiveDeployNetworking ? networkSecurityGroupContainerApps.?outputs.?resourceId ?? null : null
   }
   {
@@ -760,7 +761,7 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.0
     tags: tags
     zoneRedundant: false
     internal: false // External access (public FQDN)
-    infrastructureSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.?outputs.?subnetResourceIds[5] ?? '' : '' // Container Apps subnet
+    infrastructureSubnetResourceId: effectiveDeployNetworking ? virtualNetwork.?outputs.?subnetResourceIds[4] ?? '' : '' // Container Apps subnet
     appLogsConfiguration: deployDiagnostics ? {
       destination: 'log-analytics'
       logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.?outputs.?resourceId ?? ''
