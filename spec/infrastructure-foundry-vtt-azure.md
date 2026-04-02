@@ -80,7 +80,7 @@ azd env set AZURE_DEPLOY_DIAGNOSTICS "true"
 ```
 
 ```sh
-# Standard Web App deployment (defaults: networking enabled, SKU S1)
+# Standard Web App deployment (defaults: networking enabled, SKU P0v3)
 azd env set AZURE_COMPUTE_SERVICE "Web App"
 ```
 

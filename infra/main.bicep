@@ -99,7 +99,7 @@ param computeService string = 'Web App'
   'P2v4'
   'P3v4'
 ])
-param appServicePlanSkuName string = 'S1'
+param appServicePlanSkuName string = 'P0v3'
 
 // Container Instance Parameters (required when ComputeService is set to Container Instance)
 @description('The CPUs to assign to the Azure Container Instance for running the Foundry VTT server. Only used when deploying into an Azure Container Instance.')
