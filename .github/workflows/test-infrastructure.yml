@@ -56,7 +56,7 @@ jobs:
 
       # Required for azd to provision the infrastructure
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
-      AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
+      AZURE_LOCATION: ${{ inputs.AZURE_LOCATION || vars.AZURE_LOCATION }}
       AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
 
       # Optional azd parameters when using Federated Credentials
