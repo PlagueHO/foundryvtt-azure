@@ -10,7 +10,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "12224149977505652696"
+      "templateHash": "4314780024136940391"
     }
   },
   "parameters": {
@@ -130,7 +130,7 @@
     },
     "appServicePlanSkuName": {
       "type": "string",
-      "defaultValue": "S1",
+      "defaultValue": "P0v3",
       "allowedValues": [
         "F1",
         "B1",
@@ -14756,6 +14756,9 @@
           },
           "location": {
             "value": "[parameters('location')]"
+          },
+          "allowSharedKeyAccess": {
+            "value": "[equals(parameters('computeService'), 'Container Instance')]"
           },
           "networkAcls": {
             "value": {
