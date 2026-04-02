@@ -30,7 +30,7 @@ param computeService = readEnvironmentVariable('AZURE_COMPUTE_SERVICE', 'Web App
 param storageResourceLockEnabled = toLower(readEnvironmentVariable('AZURE_STORAGE_RESOURCE_LOCK_ENABLED', 'false')) == 'true' ? true : false
 
 // App Service Plan Parameters (required when ComputeService is set to Web App)
-param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SKUNAME', 'S1')
+param appServicePlanSkuName = readEnvironmentVariable('AZURE_APP_SERVICE_PLAN_SKUNAME', 'P0v3')
 
 // Container Instance Parameters (required when ComputeService is set to ContainerInstance)
 param containerInstanceCpu = int(empty(readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2')) ? '2' : readEnvironmentVariable('AZURE_CONTAINER_INSTANCE_CPU', '2'))

@@ -23,7 +23,7 @@ on:
         description: "The App Service Plan SKU name to use for the Web App compute service"
         required: false
         type: string
-        default: 'S1'
+        default: 'P0v3'
 
     secrets:
       AZURE_TENANT_ID:
