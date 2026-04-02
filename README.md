@@ -22,7 +22,8 @@ This solution accelerator provisions a secure, flexible, and updatable Foundry V
 Before you begin, ensure you have:
 
 1. An active Azure subscription ([Create a free account](https://azure.microsoft.com/free/)).
-1. You will need both `Contributor` and `Role Based Access Control Administrator` roles on the Azure subscription you are deploying to.
+1. You will need `Contributor` and a role that can create Azure RBAC assignments on the Azure subscription you are deploying to, such as `Role Based Access Control Administrator`, `User Access Administrator`, or `Owner`.
+1. If you use `User Access Administrator`, prefer a least-privilege condition that only allows assignment of `Key Vault Secrets Officer` and `Key Vault Secrets User` roles to service principals. This is sufficient for this solution because the deployment creates Azure Key Vault role assignments for the deployment principal and for managed identities used by Azure Web App or Azure Container Apps.
 1. [Azure Developer CLI (azd)](https://aka.ms/install-azd) installed and updated.
 
 ---
@@ -127,7 +128,7 @@ azd up
 ```
 
 > [!NOTE]
-> The first time you run `azd up`, you will be asked to select an Azure subscription and Azure region you want to deploy the resources into. You should select a subscription that you have `Contributor` and `Role Based Access Control Administrator` roles on. If you enable the `AZURE_STORAGE_RESOURCE_LOCK_ENABLED` setting during deployment then `User Access Administrator` role as well.
+> The first time you run `azd up`, you will be asked to select an Azure subscription and Azure region you want to deploy the resources into. You should select a subscription where you have `Contributor` and a role that can create Azure RBAC assignments, such as `Role Based Access Control Administrator`, `User Access Administrator`, or `Owner`. If you use `User Access Administrator`, you can constrain it with a condition so it only assigns the `Key Vault Secrets Officer` and `Key Vault Secrets User` roles to service principals. If you enable the `AZURE_STORAGE_RESOURCE_LOCK_ENABLED` setting during deployment then the deployment principal must also be allowed to create the required lock resources.
 
 This command will provision all Azure resources and deploy Foundry VTT using the parameters you set.
 
@@ -305,6 +306,20 @@ New-AzRoleAssignment `
   -Scope "/subscriptions/$subscriptionId" `
   -Description "The GitHub Actions deployment workflow for Foundry VTT."
 ```
+
+> [!IMPORTANT]
+> The GitHub Actions identity also needs permission to create Azure RBAC assignments because this deployment assigns `Key Vault Secrets Officer` and `Key Vault Secrets User` roles on the Azure Key Vault. Grant either `Role Based Access Control Administrator`, `User Access Administrator`, or `Owner` at the required scope.
+>
+> For least privilege, if you choose `User Access Administrator`, configure a condition that allows only these role assignments:
+>
+> - `Key Vault Secrets Officer`
+> - `Key Vault Secrets User`
+>
+> And limit the allowed principal type to:
+>
+> - Service principals
+>
+> This matches the deployment behavior for GitHub Actions, Azure Web App, and Azure Container Apps managed identities.
 
 For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
 

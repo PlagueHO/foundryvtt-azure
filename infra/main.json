@@ -10,7 +10,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.34.44.8038",
-      "templateHash": "18304084622092719646"
+      "templateHash": "9122427517494527711"
     }
   },
   "parameters": {
@@ -383,7 +383,7 @@
     "containerInstanceFoundryVttName": "[format('{0}{1}', variables('abbrs').containerInstanceContainerGroups, parameters('environmentName'))]",
     "containerAppEnvironmentName": "[format('{0}{1}', variables('abbrs').appManagedEnvironments, parameters('environmentName'))]",
     "containerAppFoundryVttName": "[format('{0}{1}', variables('abbrs').appContainerApps, parameters('environmentName'))]",
-    "containerAppDdbProxyName": "[format('{0}{1}ddbproxy', variables('abbrs').appContainerApps, parameters('environmentName'))]",
+    "containerAppDdbProxyName": "[take(format('{0}{1}ddbproxy', variables('abbrs').appContainerApps, parameters('environmentName')), 32)]",
     "bastionHostName": "[format('{0}{1}', variables('abbrs').networkBastionHosts, parameters('environmentName'))]",
     "keyVaultPrivateDnsZoneName": "privatelink.vaultcore.azure.net",
     "logAnalyticsWorkspaceName": "[take(format('{0}{1}', variables('abbrs').operationalInsightsWorkspaces, parameters('environmentName')), 63)]",
