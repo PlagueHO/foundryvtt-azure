@@ -1,12 +1,12 @@
-# Copilot Instructions — Coding Conventions
+# Copilot Instructions — Coding Conventions and Patterns
 
-For project guidelines (structure, build gates, versioning, security, PR rules), see [AGENTS.md](../AGENTS.md).
+This file defines the specific coding conventions and patterns used in this repository. For broad project guidelines (structure, build gates, versioning, security, PR rules), see [AGENTS.md](../AGENTS.md).
 
 ## Bicep Conventions
 
 ### Target Scope
 
-Subscription scope — creates the resource group and all child resources:
+The main deployment template uses subscription scope to create the resource group and all child resources:
 
 ```bicep
 targetScope = 'subscription'
@@ -14,7 +14,7 @@ targetScope = 'subscription'
 
 ### Resource Naming
 
-Resource names use CAF abbreviations from `abbreviations.json`:
+Resource names follow Azure Cloud Adoption Framework (CAF) abbreviations loaded from `abbreviations.json`:
 
 ```bicep
 var abbrs = loadJsonContent('./abbreviations.json')
@@ -29,11 +29,11 @@ Special naming rules for character-limited resources:
 - **Key Vault** (max 24 chars, no special chars): `'kv${replace(environmentName, '-', '')}'` truncated to 24
 - **App Service Plan**: `take('${abbrs.webSitesAppService}${environmentName}', 60)`
 
-Use `take()` for name-length-limited resources.
+Always use the `take()` function for resources with name length limits.
 
 ### Azure Verified Modules (AVM)
 
-Deploy all Azure resources using AVM modules from the public Bicep registry. Do not use raw `resource` declarations when an AVM module exists.
+All Azure resources must be deployed using AVM modules from the public Bicep registry. Never use raw `resource` declarations for resources that have an AVM module.
 
 ```bicep
 module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = if (condition) {
@@ -59,7 +59,7 @@ Key patterns:
 
 #### Naming and Types
 
-- **camelCase** for all parameter names (e.g., `environmentName`, `deployNetworking`, `appServicePlanSkuName`)
+- Use **camelCase** for all parameter names (e.g., `environmentName`, `deployNetworking`, `appServicePlanSkuName`)
 - Group parameters with comment section headers:
 
 ```bicep
@@ -88,12 +88,12 @@ Apply decorators in this order:
 param parameterName string = 'defaultValue'
 ```
 
-- `@sys.description()` — Required on all parameters; clear, user-facing language
-- `@minLength()` / `@maxLength()` — String length validation
-- `@minValue()` / `@maxValue()` — Numeric range validation
-- `@allowed([])` — Enum-style constraints
-- `@secure()` — Sensitive parameters (see AGENTS.md security principles)
-- `@metadata({ azd: { type: '...' } })` — Azure Developer CLI type hints (`'location'`, `'resourceGroup'`)
+- `@sys.description()` — Required on all parameters; use clear, user-facing language
+- `@minLength()` / `@maxLength()` — For string length validation
+- `@minValue()` / `@maxValue()` — For numeric range validation
+- `@allowed([])` — For enum-style constraints
+- `@secure()` — Required on all sensitive parameters (passwords, keys, tokens)
+- `@metadata({ azd: { type: '...' } })` — For Azure Developer CLI type hints (`'location'`, `'resourceGroup'`)
 
 #### Parameter File (main.bicepparam)
 
@@ -104,7 +104,7 @@ param environmentName = readEnvironmentVariable('AZURE_ENV_NAME', 'azdtemp')
 param location = readEnvironmentVariable('AZURE_LOCATION', 'EastUS2')
 ```
 
-Boolean conversion from environment variables:
+Boolean conversion pattern from environment variables:
 
 ```bicep
 param deployNetworking = toLower(readEnvironmentVariable('AZURE_DEPLOY_NETWORKING', 'true')) == 'true' ? true : false
@@ -112,8 +112,8 @@ param deployNetworking = toLower(readEnvironmentVariable('AZURE_DEPLOY_NETWORKIN
 
 ### Variables
 
-- **camelCase** for all variable names
-- Typed variables (experimental feature enabled in `bicepconfig.json`):
+- Use **camelCase** for all variable names
+- Use typed variables where supported (experimental feature enabled in `bicepconfig.json`):
 
 ```bicep
 var storageAccountName string = take(toLower(replace(environmentName, '-', '')), 24)
@@ -155,13 +155,15 @@ var effectiveDeployNetworking = deployNetworking && computeService == 'Web App'
 
 ### Section Headers
 
-Dashed comment blocks separate logical sections. Mark as `(OPTIONAL)` or `(REQUIRED)`:
+Use dashed comment blocks to separate logical sections:
 
 ```bicep
 // ---------- RESOURCE GROUP ----------
 // ------------- LOG ANALYTICS WORKSPACE (OPTIONAL) -------------
 // ------------- STORAGE ACCOUNT -------------
 ```
+
+Mark sections as `(OPTIONAL)` or `(REQUIRED)` where applicable.
 
 ### Tags
 
@@ -177,7 +179,7 @@ Pass `tags: tags` to every module and resource.
 
 ### Null Safety
 
-Safe navigation operator and null coalescing for optional module outputs:
+Use the safe navigation operator and null coalescing for optional module outputs:
 
 ```bicep
 serverFarmResourceId: appServicePlan.?outputs.?resourceId ?? ''
@@ -188,7 +190,7 @@ Pattern: `module.?outputs.?property ?? fallback`
 
 ### Existing Resource References
 
-Use the `existing` keyword:
+Reference pre-existing resources with the `existing` keyword:
 
 ```bicep
 resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
@@ -207,12 +209,13 @@ resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' 
 
 - Default deny when networking enabled: `defaultAction: effectiveDeployNetworking ? 'Deny' : 'Allow'`
 - Always bypass Azure services: `bypass: 'AzureServices'`
-- TLS and FTPS settings: `minTlsVersion: '1.2'`, `ftpsState: 'FtpsOnly'`
+- Enforce TLS 1.2: `minTlsVersion: '1.2'`
+- FTPS only: `ftpsState: 'FtpsOnly'`
 
 ### Diagnostics
 
-- Diagnostics settings name: `'send-to-loganalytics-${environmentName}'`
-- Conditional deployment: wrap in `deployDiagnostics` flag
+- Diagnostics settings name pattern: `'send-to-loganalytics-${environmentName}'`
+- Conditional deployment:  wrap in `deployDiagnostics` flag
 
 ### Resource Locks
 
@@ -232,13 +235,13 @@ lock: storageResourceLockEnabled ? {
 
 ### Bicep Linter Configuration
 
-`bicepconfig.json` enables:
+The `bicepconfig.json` enables:
 
 - `no-unused-params`: warning level
 - `typedVariables`: experimental feature enabled
 - `extensibility`: experimental feature enabled
 
-All new code must pass `bicep lint` with zero errors. Address warnings when practical.
+All new code must pass `bicep lint` with zero errors. Warnings should be addressed when practical.
 
 ## PowerShell Conventions
 
@@ -299,12 +302,12 @@ PowerShell scripts use **Verb-Noun** PascalCase naming: `Copy-AzureFileShareData
 
 ### Parameter Validation
 
-Use validation attributes:
+Always use validation attributes:
 
-- `[ValidateNotNullOrEmpty()]` — Required strings
-- `[ValidateRange(min, max)]` — Numeric bounds (add comment explaining the range)
-- `[ValidateSet('Value1', 'Value2')]` — Enum-like restrictions
-- `[switch]` — Boolean flags (do not use `[bool]`)
+- `[ValidateNotNullOrEmpty()]` — For required strings
+- `[ValidateRange(min, max)]` — For numeric bounds (add comment explaining the range)
+- `[ValidateSet('Value1', 'Value2')]` — For enum-like restrictions
+- `[switch]` — For boolean flags (never use `[bool]`)
 
 ### Error Handling
 
@@ -324,6 +327,7 @@ try {
 
 - Set `$ErrorActionPreference = 'Stop'` at script level
 - Use exit codes: `0` = success, `1` = failure
+- Clean up sensitive data in `finally` blocks
 - Suppress verbose output with `| Out-Null`
 
 ### Console Output Colors
@@ -353,7 +357,7 @@ Write-ColorOutput "Completed in $($duration.ToString('hh\:mm\:ss'))" -Color Gree
 
 ### Reusable Workflows
 
-All workflows use `workflow_call`:
+All workflows use the reusable workflow pattern via `workflow_call`:
 
 - Define `inputs` with description, required flag, and type
 - Define `secrets` with description and required flag
@@ -361,7 +365,7 @@ All workflows use `workflow_call`:
 
 ### Authentication
 
-Use Workload Identity Federation (OIDC) for Azure authentication:
+Always use Workload Identity Federation (OIDC) for Azure authentication:
 
 ```yaml
 - name: Authenticate azd (Federated Credentials)
@@ -373,7 +377,7 @@ Use Workload Identity Federation (OIDC) for Azure authentication:
   shell: pwsh
 ```
 
-Do not store Azure credentials as repository secrets.
+Never store Azure credentials as repository secrets.
 
 ### Conventions
 
@@ -389,7 +393,7 @@ Do not store Azure credentials as repository secrets.
 
 ### Structure
 
-Specification documents in `spec/` use this section order:
+Specification documents in `spec/` follow this section structure:
 
 1. Purpose & Scope
 1. Definitions (glossary table)
@@ -416,7 +420,7 @@ Specification documents in `spec/` use this section order:
 
 ### Examples
 
-Precede examples with a bash comment explaining intent:
+Precede each example with a bash comment explaining intent:
 
 ```bash
 # Edge-case: lightweight deployment without networking
@@ -428,7 +432,7 @@ azd env set AZURE_DEPLOY_NETWORKING "false"
 
 ### Post-Provision Hooks
 
-`azure.yaml` supports post-provision hooks for Windows (PowerShell) and POSIX shells. Hooks output deployment results (e.g., the Foundry VTT URL) after `azd up` completes.
+The `azure.yaml` supports post-provision hooks for both Windows (PowerShell) and POSIX shells. Hooks output deployment results (e.g., the Foundry VTT URL) after `azd up` completes.
 
 ### Naming
 
