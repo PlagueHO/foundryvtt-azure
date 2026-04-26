@@ -20,14 +20,6 @@
     "microsoft-learn": {
       "url": "https://learn.microsoft.com/api/mcp",
       "type": "http"
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ]
     }
   }
 }
