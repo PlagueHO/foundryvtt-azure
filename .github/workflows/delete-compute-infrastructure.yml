@@ -75,6 +75,35 @@ jobs:
               WEB_APP_NAME="${AZURE_ENV_NAME}"
               DDB_PROXY_NAME="${AZURE_ENV_NAME}ddbproxy"
               
+              # Derive Key Vault name (matches main.bicep: take('kv${replace(environmentName, '-', '')}', 24))
+              KV_ENV_NAME=$(echo "$AZURE_ENV_NAME" | tr -d '-')
+              KEY_VAULT_NAME="${KV_ENV_NAME:0:22}"
+              KEY_VAULT_NAME="kv${KEY_VAULT_NAME}"
+              KEY_VAULT_NAME="${KEY_VAULT_NAME:0:24}"
+              
+              # Remove Key Vault RBAC role assignments for the Web App managed identity before deletion
+              echo "Removing Key Vault RBAC role assignments for Web App managed identity..."
+              WEB_APP_PRINCIPAL_ID=$(az webapp identity show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" --query principalId --output tsv 2>/dev/null)
+              if [ -n "$WEB_APP_PRINCIPAL_ID" ]; then
+                echo "Web App Managed Identity Principal ID: $WEB_APP_PRINCIPAL_ID"
+                KV_RESOURCE_ID=$(az keyvault show --name "$KEY_VAULT_NAME" --resource-group "$RG_NAME" --query id --output tsv 2>/dev/null)
+                if [ -n "$KV_RESOURCE_ID" ]; then
+                  ROLE_ASSIGNMENT_IDS=$(az role assignment list --assignee "$WEB_APP_PRINCIPAL_ID" --scope "$KV_RESOURCE_ID" --query "[].id" --output tsv 2>/dev/null)
+                  if [ -n "$ROLE_ASSIGNMENT_IDS" ]; then
+                    while IFS= read -r ROLE_ID; do
+                      az role assignment delete --ids "$ROLE_ID"
+                      echo "✅ Removed Key Vault role assignment: $ROLE_ID"
+                    done <<< "$ROLE_ASSIGNMENT_IDS"
+                  else
+                    echo "ℹ️  No Key Vault role assignments found for Web App managed identity"
+                  fi
+                else
+                  echo "ℹ️  Key Vault $KEY_VAULT_NAME not found, skipping RBAC cleanup"
+                fi
+              else
+                echo "ℹ️  Web App $WEB_APP_NAME has no managed identity or does not exist, skipping RBAC cleanup"
+              fi
+              
               # Check if main Web App exists and delete it
               if az webapp show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" >/dev/null 2>&1; then
                 echo "Deleting Web App: $WEB_APP_NAME"
