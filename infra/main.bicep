@@ -394,7 +394,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
     kind: storageConfigurationMap[storageConfiguration].kind
     largeFileSharesState: 'Enabled'
     location: location
-    allowSharedKeyAccess: computeService == 'Container Instance' // Required for Azure Container Instance to mount the Azure Files volume using Shared Key
+    allowSharedKeyAccess: computeService == 'Container Instance' || computeService == 'Web App' // Required for Container Instance and Web App to mount the Azure Files volume using Shared Key (SMB)
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
