@@ -191,7 +191,7 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 }
 
 // ------------- LOG ANALYTICS WORKSPACE (OPTIONAL) -------------
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.15.0' = if (deployDiagnostics) {
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.15.1' = if (deployDiagnostics) {
   name: 'log-analytics-workspace-deployment'
   scope: rg
   params: {
@@ -290,7 +290,7 @@ module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-
   }
 }
 
-module virtualNetwork 'br/public:avm/res/network/virtual-network:0.8.0' = if (effectiveDeployNetworking) {
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.9.0' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
   scope: rg
   params: {
@@ -516,7 +516,7 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.7.0' = if (computeServ
   }
 }
 
-module webAppFoundryVtt 'br/public:avm/res/web/site:0.22.0' = if (computeService == 'Web App') {
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.23.0' = if (computeService == 'Web App') {
   name: 'web-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -619,7 +619,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.22.0' = if (computeService
   }
 }
 
-module webAppDdbProxy 'br/public:avm/res/web/site:0.22.0' = if (computeService == 'Web App' && deployDdbProxy) {
+module webAppDdbProxy 'br/public:avm/res/web/site:0.23.0' = if (computeService == 'Web App' && deployDdbProxy) {
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {
@@ -749,7 +749,7 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
 // ------------- CONTAINER APPS ENVIRONMENT (IF COMPUTE SERVICE IS CONTAINER APP) -------------
-module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.0' = if (computeService == 'Container App') {
+module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = if (computeService == 'Container App') {
   name: 'container-app-environment-deployment'
   scope: rg
   dependsOn: [
@@ -786,7 +786,7 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.0
   }
 }
 
-module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.21.0' = if (computeService == 'Container App') {
+module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.22.1' = if (computeService == 'Container App') {
   name: 'container-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -853,7 +853,7 @@ module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.21.0' = if 
   }
 }
 
-module containerAppDdbProxy 'br/public:avm/res/app/container-app:0.21.0' = if (computeService == 'Container App' && deployDdbProxy) {
+module containerAppDdbProxy 'br/public:avm/res/app/container-app:0.22.1' = if (computeService == 'Container App' && deployDdbProxy) {
   name: 'container-app-ddbproxy-deployment'
   scope: rg
   params: {
