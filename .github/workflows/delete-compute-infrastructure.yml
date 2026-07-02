@@ -56,6 +56,15 @@ jobs:
         run: |
           # Set resource group name with fallback
           RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+
+          # If the environment has never been deployed (or already fully removed),
+          # treat deletion as successful and exit early.
+          RG_EXISTS=$(az group exists --name "$RG_NAME")
+          if [ "$RG_EXISTS" != "true" ]; then
+            echo "ℹ️  Resource Group $RG_NAME does not exist."
+            echo "ℹ️  Compute resources are already deleted. Nothing to do."
+            exit 0
+          fi
           
           echo "Starting deletion of compute resources in environment: $AZURE_ENV_NAME"
           echo "Resource Group: $RG_NAME"
@@ -83,16 +92,19 @@ jobs:
               
               # Remove Key Vault RBAC role assignments for the Web App managed identity before deletion
               echo "Removing Key Vault RBAC role assignments for Web App managed identity..."
-              WEB_APP_PRINCIPAL_ID=$(az webapp identity show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" --query principalId --output tsv 2>/dev/null)
+              WEB_APP_PRINCIPAL_ID=$(az webapp identity show --name "$WEB_APP_NAME" --resource-group "$RG_NAME" --query principalId --output tsv 2>/dev/null || true)
               if [ -n "$WEB_APP_PRINCIPAL_ID" ]; then
                 echo "Web App Managed Identity Principal ID: $WEB_APP_PRINCIPAL_ID"
-                KV_RESOURCE_ID=$(az keyvault show --name "$KEY_VAULT_NAME" --resource-group "$RG_NAME" --query id --output tsv 2>/dev/null)
+                KV_RESOURCE_ID=$(az keyvault show --name "$KEY_VAULT_NAME" --resource-group "$RG_NAME" --query id --output tsv 2>/dev/null || true)
                 if [ -n "$KV_RESOURCE_ID" ]; then
-                  ROLE_ASSIGNMENT_IDS=$(az role assignment list --assignee "$WEB_APP_PRINCIPAL_ID" --scope "$KV_RESOURCE_ID" --query "[].id" --output tsv 2>/dev/null)
+                  ROLE_ASSIGNMENT_IDS=$(az role assignment list --assignee "$WEB_APP_PRINCIPAL_ID" --scope "$KV_RESOURCE_ID" --query "[].id" --output tsv 2>/dev/null || true)
                   if [ -n "$ROLE_ASSIGNMENT_IDS" ]; then
                     while IFS= read -r ROLE_ID; do
-                      az role assignment delete --ids "$ROLE_ID"
-                      echo "✅ Removed Key Vault role assignment: $ROLE_ID"
+                      if az role assignment delete --ids "$ROLE_ID" >/dev/null 2>&1; then
+                        echo "✅ Removed Key Vault role assignment: $ROLE_ID"
+                      else
+                        echo "ℹ️  Key Vault role assignment already deleted or unavailable: $ROLE_ID"
+                      fi
                     done <<< "$ROLE_ASSIGNMENT_IDS"
                   else
                     echo "ℹ️  No Key Vault role assignments found for Web App managed identity"
@@ -234,6 +246,14 @@ jobs:
         run: |
           # Set resource group name with fallback
           RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+
+          # If the resource group is absent, compute resources are already gone.
+          RG_EXISTS=$(az group exists --name "$RG_NAME")
+          if [ "$RG_EXISTS" != "true" ]; then
+            echo "ℹ️  Resource Group $RG_NAME does not exist."
+            echo "✅ Verification complete: compute resources are already deleted."
+            exit 0
+          fi
           
           echo "Verifying resource deletion..."
           
