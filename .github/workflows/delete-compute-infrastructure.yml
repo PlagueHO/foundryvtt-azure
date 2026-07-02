@@ -56,6 +56,15 @@ jobs:
         run: |
           # Set resource group name with fallback
           RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+
+          # If the environment has never been deployed (or already fully removed),
+          # treat deletion as successful and exit early.
+          RG_EXISTS=$(az group exists --name "$RG_NAME")
+          if [ "$RG_EXISTS" != "true" ]; then
+            echo "ℹ️  Resource Group $RG_NAME does not exist."
+            echo "ℹ️  Compute resources are already deleted. Nothing to do."
+            exit 0
+          fi
           
           echo "Starting deletion of compute resources in environment: $AZURE_ENV_NAME"
           echo "Resource Group: $RG_NAME"
@@ -234,6 +243,14 @@ jobs:
         run: |
           # Set resource group name with fallback
           RG_NAME="${AZURE_RESOURCE_GROUP_NAME:-rg-${AZURE_ENV_NAME}}"
+
+          # If the resource group is absent, compute resources are already gone.
+          RG_EXISTS=$(az group exists --name "$RG_NAME")
+          if [ "$RG_EXISTS" != "true" ]; then
+            echo "ℹ️  Resource Group $RG_NAME does not exist."
+            echo "✅ Verification complete: compute resources are already deleted."
+            exit 0
+          fi
           
           echo "Verifying resource deletion..."
           
