@@ -349,6 +349,12 @@ Once you have configured the GitHub Actions workflow, you can trigger it manuall
 
 Contributions are welcome! Please open issues or pull requests.
 
+### Dependency maintenance
+
+Dependabot follows the `dependabot-monthly-v1` policy. Routine version updates are scheduled for the first calendar day of each month, including weekends, at 09:00 `Pacific/Auckland`; GitHub queueing may delay when checks actually start. Minor and patch updates are grouped per configured ecosystem and directory as `devcontainers-minor-and-patch` or `github-actions-minor-and-patch`; major updates remain separate pull requests on the same monthly schedule. A three-day release-age cooldown applies to routine updates.
+
+Security updates are the exception to the monthly window: they remain event-driven and are grouped as `devcontainers-security` or `github-actions-security`, independently of the version-update schedule and cooldown. To request an update outside the normal window, use Dependabot's **Check for updates** action on the repository's Dependabot page; manual checks may create pull requests outside the monthly window.
+
 ---
 
 ## License

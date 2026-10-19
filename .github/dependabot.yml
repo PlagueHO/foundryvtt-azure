@@ -5,26 +5,67 @@
 # https://containers.dev/guide/dependabot
 
 version: 2
+# dependabot-monthly-v1: routine updates are scheduled for 09:00
+# Pacific/Auckland on the first calendar day each month, including weekends.
+# Minor/patch groups are devcontainers-minor-and-patch and
+# github-actions-minor-and-patch; security groups remain event-driven:
+# devcontainers-security and github-actions-security.
 updates:
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: "monthly"
+      time: "09:00"
+      timezone: "Pacific/Auckland"
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    labels:
+      - "dependencies"
+      - "devcontainers"
+    rebase-strategy: "auto"
+    groups:
+      devcontainers-minor-and-patch:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      devcontainers-security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
 
   # GitHub Actions dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      time: "06:00"
+      interval: "monthly"
+      time: "09:00"
+      timezone: "Pacific/Auckland"
+    cooldown:
+      default-days: 3
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
+      prefix-development: "deps"
     labels:
       - "dependencies"
       - "github-actions"
     rebase-strategy: "auto"
     groups:
-      gh-actions:
+      github-actions-minor-and-patch:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      github-actions-security:
+        applies-to: "security-updates"
         patterns:
           - "*"
