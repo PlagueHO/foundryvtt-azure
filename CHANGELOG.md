@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Aligned Dependabot with the `dependabot-monthly-v1` monthly maintenance policy while keeping security updates event-driven.
 - Updated `effectiveDeployNetworking` to enable VNet deployment for both Web App and Container App compute services.
 - Updated specification, AGENTS.md, and README.md to reflect three compute modes.
 
