@@ -143,7 +143,7 @@ try {
             try {
                 $response = Invoke-WebRequest -Uri "https://$($app.properties.defaultHostName)/" -SkipHttpErrorCheck -TimeoutSec 30
                 $ready = $response.StatusCode -eq 200 -and $response.Content -match '<title>[^<]*Foundry Virtual Tabletop[^<]*</title>'
-            } catch [System.Net.Http.HttpRequestException], [System.Net.WebException] {
+            } catch [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
                 Write-Warning "The Web App HTTP request failed on attempt ${attempt}: $($_.Exception.Message). Retrying within the configured limit."
             }
         }
