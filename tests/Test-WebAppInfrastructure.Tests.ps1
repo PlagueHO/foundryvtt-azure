@@ -6,6 +6,10 @@ BeforeAll {
     $repoRoot = Split-Path -Parent $PSScriptRoot
     $checkScript = Join-Path $repoRoot 'scripts\Test-WebAppInfrastructure.ps1'
     $originalLastExitCode = $global:LASTEXITCODE
+
+    function azd {
+        throw 'The azd command must be mocked during these unit tests.'
+    }
 }
 
 AfterAll {
@@ -128,6 +132,30 @@ Describe 'Test Web App checks' {
     It 'does not accept an HTTP 200 platform page as Foundry readiness' {
         Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>' } }
         { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+    }
+
+    It 'retries an HTTP timeout before Foundry becomes ready' {
+        $httpState = @{ Attempts = 0 }
+        Mock Invoke-WebRequest {
+            $httpState.Attempts++
+            if ($httpState.Attempts -eq 1) {
+                throw [System.Threading.Tasks.TaskCanceledException]::new('HTTP request timed out.')
+            }
+            @{ StatusCode = 200; Content = '<title>Foundry Virtual Tabletop</title>' }
+        }
+        (& $checkScript @checkParameters).FoundryHttpReady | Should -BeTrue
+        Should -Invoke Invoke-WebRequest -Times 2 -Exactly
+        Should -Invoke Start-Sleep -Times 1 -Exactly
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*HTTP request failed*' }
+    }
+
+    It 'stops at the retry limit when HTTP requests keep timing out' {
+        Mock Invoke-WebRequest {
+            throw [System.Threading.Tasks.TaskCanceledException]::new('HTTP request timed out.')
+        }
+        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        Should -Invoke Invoke-WebRequest -Times 2 -Exactly
+        Should -Invoke Start-Sleep -Times 1 -Exactly
     }
 
     It 'accepts only mountinfo for the expected CIFS share at /data' {
