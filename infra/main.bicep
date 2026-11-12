@@ -246,7 +246,7 @@ var subnets = [
   }
 ]
 
-module networkSecurityGroupWebApp 'br/public:avm/res/network/network-security-group:0.5.3' = if (effectiveDeployNetworking) {
+module networkSecurityGroupWebApp 'br/public:avm/res/network/network-security-group:0.5.4' = if (effectiveDeployNetworking) {
   name: 'network-security-group-web-app-deployment'
   scope: rg
   params: {
@@ -257,7 +257,7 @@ module networkSecurityGroupWebApp 'br/public:avm/res/network/network-security-gr
   }
 }
 
-module networkSecurityGroupContainerApps 'br/public:avm/res/network/network-security-group:0.5.3' = if (effectiveDeployNetworking) {
+module networkSecurityGroupContainerApps 'br/public:avm/res/network/network-security-group:0.5.4' = if (effectiveDeployNetworking) {
   name: 'network-security-group-container-apps-deployment'
   scope: rg
   params: {
@@ -268,7 +268,7 @@ module networkSecurityGroupContainerApps 'br/public:avm/res/network/network-secu
   }
 }
 
-module networkSecurityGroupStorage 'br/public:avm/res/network/network-security-group:0.5.3' = if (effectiveDeployNetworking) {
+module networkSecurityGroupStorage 'br/public:avm/res/network/network-security-group:0.5.4' = if (effectiveDeployNetworking) {
   name: 'network-security-group-storage-deployment'
   scope: rg
   params: {
@@ -279,7 +279,7 @@ module networkSecurityGroupStorage 'br/public:avm/res/network/network-security-g
   }
 }
 
-module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-group:0.5.3' = if (effectiveDeployNetworking) {
+module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-group:0.5.4' = if (effectiveDeployNetworking) {
   name: 'network-security-group-keyvault-deployment'
   scope: rg
   params: {
@@ -290,7 +290,7 @@ module networkSecurityGroupKeyVault 'br/public:avm/res/network/network-security-
   }
 }
 
-module virtualNetwork 'br/public:avm/res/network/virtual-network:0.9.0' = if (effectiveDeployNetworking) {
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.10.2' = if (effectiveDeployNetworking) {
   name: 'virtualNetwork'
   scope: rg
   params: {
@@ -368,7 +368,7 @@ var privateEndpoints = effectiveDeployNetworking ? [
   }
 ] : []
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.33.1' = {
   name: 'storage-account-deployment'
   scope: rg
   params: {
@@ -422,7 +422,7 @@ resource storageAccountReference 'Microsoft.Storage/storageAccounts@2021-04-01' 
 }
 
 // ------------- KEY VAULT -------------
-module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.14.2' = {
   name: 'key-vault-deployment'
   scope: rg
   dependsOn: [
@@ -516,7 +516,7 @@ module appServicePlan 'br/public:avm/res/web/serverfarm:0.7.0' = if (computeServ
   }
 }
 
-module webAppFoundryVtt 'br/public:avm/res/web/site:0.23.0' = if (computeService == 'Web App') {
+module webAppFoundryVtt 'br/public:avm/res/web/site:0.24.0' = if (computeService == 'Web App') {
   name: 'web-app-foundry-vtt-deployment'
   scope: rg
   params: {
@@ -541,6 +541,9 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.23.0' = if (computeService
       systemAssigned: true
     }
     serverFarmResourceId: appServicePlan.?outputs.?resourceId ?? ''
+    outboundVnetRouting: {
+      allTraffic: effectiveDeployNetworking
+    }
     siteConfig: {
       alwaysOn: true
       appSettings: [
@@ -589,7 +592,6 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.23.0' = if (computeService
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${storageAccountKeySecretName})'
         }
       ]
-      vnetRouteAllEnabled: effectiveDeployNetworking
       detailedErrorLoggingEnabled: true
       ftpsState: 'FtpsOnly'
       httpLoggingEnabled: true
@@ -619,7 +621,7 @@ module webAppFoundryVtt 'br/public:avm/res/web/site:0.23.0' = if (computeService
   }
 }
 
-module webAppDdbProxy 'br/public:avm/res/web/site:0.23.0' = if (computeService == 'Web App' && deployDdbProxy) {
+module webAppDdbProxy 'br/public:avm/res/web/site:0.24.0' = if (computeService == 'Web App' && deployDdbProxy) {
   name: 'web-app-ddbproxy-deployment'
   scope: rg
   params: {

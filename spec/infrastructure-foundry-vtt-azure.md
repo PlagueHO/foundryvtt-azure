@@ -32,6 +32,7 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 - **R-5**: All secrets (storage key, Foundry credentials) MUST reside in KV; Web App and Container App MSI granted **Key Vault Secrets User**.
 - **R-6**: Storage account name ≤ 24 lower-case alphanumerics and may be locked (`CanNotDelete`) when `storageResourceLockEnabled == true`.
 - **R-7**: Container App deployments MUST use a Consumption workload profile and support scale-to-zero (`minReplicas: 0`).
+- **R-8**: The Foundry Web App MUST set the AVM parameter `outboundVnetRouting.allTraffic` to `effectiveDeployNetworking`. It MUST NOT use the nested `siteConfig.vnetRouteAllEnabled` setting. With networking disabled, routing MUST be false and VNet integration MUST be absent.
 - **C-1**: ACI deployments cannot use VNets (Azure limitation).
 - **G-1**: Use AVM modules (`br/public:avm/*`) for all Azure resources.  
 - **G-2**: Tags must at minimum include `azd-env-name`.  
@@ -130,6 +131,9 @@ azd env set AZURE_DEPLOY_NETWORKING "false"
 1. If `deployNetworking == true`, public network access on Storage and KV is **Disabled**.
 1. GitHub Actions workflow passes using Workload Identity Federation.
 1. Container App scales to zero replicas when idle (`containerAppMinReplicas == 0`).
+1. For an isolated Web App test, verify both networking-enabled and networking-disabled deployments. Confirm effective `outboundVnetRouting.allTraffic`, VNet integration, and all four resolved Key Vault references.
+1. Confirm the application container mounts the expected Azure Files SMB share at `/data` and Foundry starts successfully. An HTTP 200 response or a configured storage mount alone is not sufficient evidence. If application-container mount evidence is unavailable, runtime verification remains blocked.
+1. Obtain separate approval for paid test resources and cost limits before deployment. Do not modify production without separate approval. Delete isolated test resources after each case, including after failure.
 
 ## 8. Related Specifications / Further Reading
 
@@ -139,4 +143,5 @@ azd env set AZURE_DEPLOY_NETWORKING "false"
 - [MrPrimate Foundry VTT DDB Proxy](https://github.com/MrPrimate/ddb-proxy)
 - [Azure Well-Architected Framework](https://learn.microsoft.com/en-us/azure/well-architected/)
 - [Azure Verified Modules](https://aka.ms/avm)
+- [App Service VNet routing](https://learn.microsoft.com/azure/app-service/configure-vnet-integration-routing)
 - [Azure Verified Modules](https://aka.ms/avm)

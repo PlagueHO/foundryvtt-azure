@@ -10,12 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
 - Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.
+- Added focused Web App regression checks and sequential test cases with networking enabled and disabled. Runtime Azure Files mount evidence remains a separate required check.
 
 ### Changed
 
 - Aligned Dependabot with the `dependabot-monthly-v1` monthly maintenance policy while keeping security updates event-driven.
 - Updated `effectiveDeployNetworking` to enable VNet deployment for both Web App and Container App compute services.
 - Updated specification, AGENTS.md, and README.md to reflect three compute modes.
+- Updated AVM Web App to `0.24.0`, VNet to `0.10.2`, NSG to `0.5.4`, Storage Account to `0.33.1`, and Key Vault to `0.14.2`. App Service Plan and private DNS modules remain at their current published versions.
+
+### Fixed
+
+- Set the Foundry Web App's `outboundVnetRouting.allTraffic` AVM parameter to `effectiveDeployNetworking` instead of the old nested `siteConfig.vnetRouteAllEnabled` setting. This configures routing for private Key Vault access and the Azure Files mount without changing networking-disabled deployments. Relates to #59.
 
 ## [2.0.0] - 2025-05-24
 

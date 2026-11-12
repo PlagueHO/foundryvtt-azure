@@ -162,6 +162,44 @@ You can control deployment by setting environment variables before running `azd 
 
 For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
+### Web App VNet routing
+
+For the Foundry Web App, `AZURE_DEPLOY_NETWORKING=true` sets the AVM module parameter `outboundVnetRouting.allTraffic` to `true`. This routes application and configuration traffic through VNet integration, including Key Vault access and content-share traffic. The template does not use the old nested `siteConfig.vnetRouteAllEnabled` setting. See [App Service VNet routing](https://learn.microsoft.com/azure/app-service/configure-vnet-integration-routing).
+
+With networking disabled, `allTraffic` is `false` and the app has no VNet integration. Existing public-endpoint behaviour is unchanged. Do not enable public storage access to work around a failed private mount.
+
+### Verify an isolated Web App test
+
+Obtain approval for the test subscription, region, resource limits, cost limit, and Foundry licence use before deployment. Do not use production resources. The test workflow runs Web App cases with networking enabled and disabled in series, then deletes each test deployment.
+
+The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
+
+Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
+
+Save the captured text locally, then run the read-only check with the existing `azd` login:
+
+```powershell
+.\scripts\Test-WebAppInfrastructure.ps1 `
+  -SubscriptionId '<test-subscription-id>' `
+  -TenantId '<test-tenant-id>' `
+  -ResourceGroupName '<test-resource-group>' `
+  -WebAppName '<test-web-app>' `
+  -StorageAccountName '<test-storage-account>' `
+  -Networking Enabled `
+  -MountInfoPath '.\test-mountinfo.txt'
+```
+
+Use `-Networking Disabled` for the case without networking. Without `-MountInfoPath`, the script reports `RuntimeMountVerified=false`. Record successful Foundry startup and private endpoint/DNS checks before accepting the fix. Delete only the isolated test resources with `azd down --no-prompt --purge --force`, including after a failed check.
+
+Local regression checks require PowerShell 7 and Pester 5 or later:
+
+```powershell
+bicep lint .\infra\main.bicep
+bicep build .\infra\main.bicep
+Import-Module Pester -MinimumVersion 5.0
+Invoke-Pester -Path .\tests\Test-WebAppInfrastructure.Tests.ps1 -Output Detailed
+```
+
 ---
 
 ## Outputs
