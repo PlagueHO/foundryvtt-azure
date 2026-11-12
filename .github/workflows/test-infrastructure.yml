@@ -24,6 +24,14 @@ on:
         required: false
         type: string
         default: 'P0v3'
+      AZURE_COMPUTE_SERVICE:
+        description: "Override the compute service for an isolated test. Otherwise use the environment variable."
+        required: false
+        type: string
+      AZURE_DEPLOY_NETWORKING:
+        description: "Override networking with 'true' or 'false' for an isolated test. Otherwise use the environment variable."
+        required: false
+        type: string
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
@@ -74,10 +82,10 @@ jobs:
 
       # Environment variables for azd
       AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
-      AZURE_COMPUTE_SERVICE: ${{ vars.AZURE_COMPUTE_SERVICE }}
+      AZURE_COMPUTE_SERVICE: ${{ inputs.AZURE_COMPUTE_SERVICE || vars.AZURE_COMPUTE_SERVICE }}
       AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
       AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
-      AZURE_DEPLOY_NETWORKING: ${{ vars.AZURE_DEPLOY_NETWORKING }}
+      AZURE_DEPLOY_NETWORKING: ${{ inputs.AZURE_DEPLOY_NETWORKING || vars.AZURE_DEPLOY_NETWORKING }}
       AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
       AZURE_CONTAINER_INSTANCE_CPU: ${{ vars.AZURE_CONTAINER_INSTANCE_CPU || '2' }}
       AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB: ${{ vars.AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB }}
@@ -122,6 +130,31 @@ jobs:
             }
           }
           
+      - name: Check Web App routing, references, and HTTP readiness
+        if: env.AZURE_COMPUTE_SERVICE == 'Web App'
+        shell: pwsh
+        run: |
+          $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
+          $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+          $networking = if ($Env:AZURE_DEPLOY_NETWORKING -eq 'true') { 'Enabled' } else { 'Disabled' }
+          $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupName)) {
+            throw 'Cannot read the provisioned test resource group name from azd.'
+          }
+          $result = & ./scripts/Test-WebAppInfrastructure.ps1 `
+            -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID `
+            -TenantId $Env:AZURE_TENANT_ID `
+            -ResourceGroupName $resourceGroupName `
+            -WebAppName $Env:AZURE_ENV_NAME `
+            -StorageAccountName $storageAccountName `
+            -Networking $networking
+          "Web App routing, Key Vault references, storage configuration, and Foundry HTTP readiness: passed." |
+            Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+          if (-not $result.RuntimeMountVerified) {
+            "Runtime /data mount verification: BLOCKED. Application-container mountinfo evidence is still required before accepting the fix." |
+              Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+          }
+
       - name: Delete Infrastructure
         if: always()
         run: azd down --no-prompt --purge --force
