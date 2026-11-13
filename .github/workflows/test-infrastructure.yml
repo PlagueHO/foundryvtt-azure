@@ -48,6 +48,10 @@ on:
         description: "For one approved private test, compare baseline startup with unchanged mount replay before adding the mount probe."
         type: boolean
         default: false
+      CHECK_PRIVATE_ACCESS:
+        description: "Run the approved private network/identity test and temporary mount-removal control."
+        type: boolean
+        default: false
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
@@ -121,14 +125,16 @@ jobs:
 
     steps:
       - name: Validate controlled private test scope
-        if: inputs.CHECK_MOUNT_STARTUP_ORDER
+        if: inputs.CHECK_MOUNT_STARTUP_ORDER || inputs.CHECK_PRIVATE_ACCESS
         shell: pwsh
         run: |
           if ($Env:AZURE_ENV_NAME -notmatch '^fvtt-asp-on-\d+-\d+$' -or
               $Env:AZURE_RESOURCE_GROUP_NAME -ne "rg-$Env:AZURE_ENV_NAME" -or
               $Env:AZURE_COMPUTE_SERVICE -ne 'Web App' -or $Env:AZURE_DEPLOY_NETWORKING -ne 'true' -or
               $Env:AZURE_DEPLOY_DDB_PROXY -ne 'false' -or $Env:AZURE_LOCATION -ne 'NewZealandNorth' -or
-              $Env:AZURE_APP_SERVICE_PLAN_SKUNAME -ne 'P0v3') {
+              $Env:AZURE_APP_SERVICE_PLAN_SKUNAME -ne 'P0v3' -or
+              ('${{ inputs.CHECK_MOUNT_STARTUP_ORDER }}' -eq 'true' -and '${{ inputs.CHECK_PRIVATE_ACCESS }}' -eq 'true') -or
+              '${{ inputs.DIAGNOSTICS_ONLY }}' -eq 'true' -or '${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
             throw 'The controlled test does not match the approved private scope. No Azure login or deployment was started.'
           }
       - name: Checkout
@@ -170,7 +176,7 @@ jobs:
           
       - name: Check Web App routing, references, and HTTP readiness
         id: readiness
-        if: ${{ !inputs.DIAGNOSTICS_ONLY && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
+        if: ${{ !inputs.DIAGNOSTICS_ONLY && !inputs.CHECK_PRIVATE_ACCESS && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
         timeout-minutes: ${{ inputs.CHECK_MOUNT_STARTUP_ORDER && 15 || 40 }}
         shell: pwsh
         run: |
@@ -196,6 +202,16 @@ jobs:
             "Runtime /data mount verification: BLOCKED. Application-container mountinfo evidence is still required before accepting the fix." |
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           }
+
+      - name: Separate private network, identity, and storage access failures
+        if: ${{ inputs.CHECK_PRIVATE_ACCESS && steps.provision.outcome == 'success' }}
+        timeout-minutes: 40
+        shell: pwsh
+        run: |
+          & ./scripts/Test-PrivateWebAppAccess.ps1 `
+            -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID -TenantId $Env:AZURE_TENANT_ID `
+            -WebAppName $Env:AZURE_ENV_NAME -ResourceGroupName $Env:AZURE_RESOURCE_GROUP_NAME `
+            -EvidencePath (Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-access.txt") -Confirm:$false
 
       - name: Compare startup after unchanged private test mount replay
         id: mount_replay
@@ -266,7 +282,7 @@ jobs:
           }
 
       - name: Report Web App container diagnostic categories
-        if: ${{ always() && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
+        if: ${{ always() && !inputs.CHECK_PRIVATE_ACCESS && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
         timeout-minutes: 10
         shell: pwsh
         env:
@@ -492,11 +508,20 @@ jobs:
           }
 
       - name: Preserve application-container mount evidence
-        if: ${{ always() && ((inputs.DIAGNOSTICS_ONLY && inputs.CAPTURE_MOUNT_EVIDENCE) || inputs.CHECK_MOUNT_STARTUP_ORDER) }}
+        if: ${{ always() && ((inputs.DIAGNOSTICS_ONLY && inputs.CAPTURE_MOUNT_EVIDENCE) || inputs.CHECK_MOUNT_STARTUP_ORDER || inputs.CHECK_PRIVATE_ACCESS) }}
         uses: actions/upload-artifact@v7
         with:
           name: webapp-runtime-mount-${{ env.AZURE_ENV_NAME }}
           path: ${{ runner.temp }}/${{ env.AZURE_ENV_NAME }}-mountinfo.txt
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Preserve private access evidence
+        if: ${{ always() && inputs.CHECK_PRIVATE_ACCESS }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: webapp-private-access-${{ env.AZURE_ENV_NAME }}
+          path: ${{ runner.temp }}/${{ env.AZURE_ENV_NAME }}-access.txt
           retention-days: 7
           if-no-files-found: warn
 

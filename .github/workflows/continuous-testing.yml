@@ -18,6 +18,10 @@ on:
         description: "Run one paid private Web App test to compare startup before and after unchanged mount replay. Requires separate approval."
         type: boolean
         default: false
+      PRIVATE_ACCESS_TEST:
+        description: "One approved private access test with filesystem logs and a temporary mount-removal control. Requires separate cost and control approval."
+        type: boolean
+        default: false
       DIAGNOSTIC_ENV_NAME:
         description: "Read logs from an existing fvtt-asp-on/off test environment. Does not deploy or delete resources."
         type: string
@@ -54,6 +58,7 @@ jobs:
           CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
           POLICY_DIAGNOSTICS_ONLY: ${{ inputs.POLICY_DIAGNOSTICS_ONLY }}
           PRIVATE_STARTUP_TEST: ${{ inputs.PRIVATE_STARTUP_TEST }}
+          PRIVATE_ACCESS_TEST: ${{ inputs.PRIVATE_ACCESS_TEST }}
         run: |
           if ($Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -and [string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME)) {
             throw 'Mount evidence capture requires an existing isolated test environment name. No deployment was started.'
@@ -65,10 +70,13 @@ jobs:
               ([string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME) -or $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true')) {
             throw 'Policy-only diagnostics require an exact test name and cannot capture mount evidence. No deployment was started.'
           }
-          if ($Env:PRIVATE_STARTUP_TEST -eq 'true' -and
+          if (($Env:PRIVATE_STARTUP_TEST -eq 'true' -or $Env:PRIVATE_ACCESS_TEST -eq 'true') -and
               (-not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME) -or
                $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -or $Env:POLICY_DIAGNOSTICS_ONLY -eq 'true')) {
             throw 'The private startup test cannot be combined with existing-environment diagnostic inputs.'
+          }
+          if ($Env:PRIVATE_STARTUP_TEST -eq 'true' -and $Env:PRIVATE_ACCESS_TEST -eq 'true') {
+            throw 'Select only one private test mode. No deployment was started.'
           }
 
   lint-and-publish-bicep:
@@ -89,8 +97,9 @@ jobs:
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
       AZURE_DEPLOY_NETWORKING: ${{ 'true' }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ (inputs.WEB_APP_ONLY || inputs.PRIVATE_STARTUP_TEST) && 'false' || '' }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ (inputs.WEB_APP_ONLY || inputs.PRIVATE_STARTUP_TEST || inputs.PRIVATE_ACCESS_TEST) && 'false' || '' }}
       CHECK_MOUNT_STARTUP_ORDER: ${{ inputs.PRIVATE_STARTUP_TEST }}
+      CHECK_PRIVATE_ACCESS: ${{ inputs.PRIVATE_ACCESS_TEST }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -101,7 +110,7 @@ jobs:
 
   test-webapp-without-networking:
     name: Test WebApp Deployment without Networking
-    if: ${{ always() && !inputs.PRIVATE_STARTUP_TEST && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
+    if: ${{ always() && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp
@@ -124,7 +133,7 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-app:
     name: Test Container App Deployment
-    if: ${{ !inputs.WEB_APP_ONLY && !inputs.PRIVATE_STARTUP_TEST }}
+    if: ${{ !inputs.WEB_APP_ONLY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp-without-networking
