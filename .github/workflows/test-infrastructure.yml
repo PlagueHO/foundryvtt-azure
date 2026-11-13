@@ -204,6 +204,23 @@ jobs:
             }
             $headers = @{ Authorization = "Bearer $token" }
             $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            foreach ($referenceName in @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')) {
+              $referenceStatus = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              "Key Vault reference $referenceName status: $($referenceStatus.properties.status)." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            }
+            $appIdentity = Invoke-RestMethod -Uri "$appUri`?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $vaultName = ('kv' + $Env:AZURE_ENV_NAME.Replace('-', ''))
+            $vaultName = $vaultName.Substring(0, [Math]::Min(24, $vaultName.Length))
+            $vaultUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.KeyVault/vaults/$vaultName"
+            $vault = Invoke-RestMethod -Uri "$vaultUri`?api-version=2026-02-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $roles = Invoke-RestMethod -Uri "$vaultUri/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $hasSecretsRole = @($roles.value | Where-Object {
+              $_.properties.principalId -eq $appIdentity.identity.principalId -and
+              $_.properties.roleDefinitionId -like '*/4633458b-17de-408a-b874-0445c86b69e6'
+            }).Count -gt 0
+            "Key Vault access: publicNetworkAccess=$($vault.properties.publicNetworkAccess); defaultAction=$($vault.properties.networkAcls.defaultAction); enableRbacAuthorization=$($vault.properties.enableRbacAuthorization); appSecretsUserRole=$hasSecretsRole." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
             if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
               if ('${{ inputs.DIAGNOSTICS_ONLY }}' -ne 'true') {
                 throw 'Mount evidence capture requires the existing isolated test diagnostics mode.'
