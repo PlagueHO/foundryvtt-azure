@@ -250,6 +250,49 @@ jobs:
                   Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
               }
             }
+            $storageAccountName = $Env:DIAGNOSTIC_ENV_NAME.Replace('-', '').ToLowerInvariant()
+            $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+            $storageId = "/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$Env:DIAGNOSTIC_ENV_NAME/providers/Microsoft.Storage/storageAccounts/$storageAccountName"
+            $selectedFields = @(
+              'Microsoft.Storage/storageAccounts/publicNetworkAccess'
+              'Microsoft.Storage/storageAccounts/allowSharedKeyAccess'
+              'Microsoft.Storage/storageAccounts/networkAcls.defaultAction'
+              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.authenticationMethods'
+              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.versions'
+              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.channelEncryption'
+            )
+            foreach ($targetId in @($storageId, "$storageId/fileServices/default")) {
+              $storagePolicyUri = "https://management.azure.com$targetId/providers/Microsoft.PolicyInsights/policyStates/default/queryResults?api-version=2019-10-01&`$from=$from&`$top=100&`$expand=PolicyEvaluationDetails"
+              try {
+                $storageStates = Invoke-RestMethod -Method Post -Uri $storagePolicyUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+                if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+                Write-Warning 'Retained storage evaluations are unavailable (HTTP 404). No storage access setting was verified.'
+                continue
+              }
+              if (-not [string]::IsNullOrWhiteSpace($storageStates.'@odata.nextLink')) {
+                throw 'More than 100 storage policy states exist. The retained access inspection is incomplete.'
+              }
+              $reported = 0
+              foreach ($state in $storageStates.value) {
+                foreach ($expression in $state.policyEvaluationDetails.evaluatedExpressions) {
+                  if ($expression.expression -notin $selectedFields) { continue }
+                  $value = $expression.expressionValue
+                  if ($value -isnot [bool] -and
+                      $value -notin @('Enabled', 'Disabled', 'Allow', 'Deny', 'Kerberos', 'NTLMv2', 'Kerberos;NTLMv2', 'NTLMv2;Kerberos') -and
+                      $value -notmatch '^(?:[23]\.[01](?:\.1)?|AES-(?:128|256)-(?:CCM|GCM))(?:;(?:[23]\.[01](?:\.1)?|AES-(?:128|256)-(?:CCM|GCM)))*$') {
+                    Write-Warning 'An access evaluation has no supported scalar value. Raw policy values were not printed.'
+                    continue
+                  }
+                  "Retained storage field: field=$($expression.expression); value=$value; time=$($state.timestamp)." |
+                    Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+                  $reported++
+                }
+              }
+              if ($reported -eq 0) {
+                Write-Warning 'No evaluated values for the selected storage access fields were returned. Their configuration remains unverified.'
+              }
+            }
           } finally {
-            Remove-Variable -Name token, headers, states, definition -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, states, definition, storageStates -Force -ErrorAction SilentlyContinue
           }
