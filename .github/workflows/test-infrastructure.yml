@@ -226,6 +226,22 @@ jobs:
             "Key Vault deployment input: publicNetworkAccess=$($vaultDeployment.properties.parameters.publicNetworkAccess.value); defaultAction=$($vaultDeployment.properties.parameters.networkAcls.value.defaultAction)." |
               Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
             if ($vaultDeployment.properties.parameters.publicNetworkAccess.value -eq 'Enabled' -and $vault.properties.publicNetworkAccess -eq 'Disabled') {
+              $previousApiVault = Invoke-RestMethod -Uri "$vaultUri`?api-version=2024-11-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              "Vault access through API 2024-11-01: publicNetworkAccess=$($previousApiVault.properties.publicNetworkAccess); defaultAction=$($previousApiVault.properties.networkAcls.defaultAction)." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              $from = [DateTime]::UtcNow.AddHours(-2).ToString('o')
+              $to = [DateTime]::UtcNow.ToString('o')
+              $activityFilter = [uri]::EscapeDataString("eventTimestamp ge '$from' and eventTimestamp le '$to' and resourceUri eq '$($vault.id)'")
+              $activityUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.Insights/eventtypes/management/values?api-version=2015-04-01&`$filter=$activityFilter"
+              $activity = Invoke-RestMethod -Uri $activityUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              $deploymentPrincipals = @($Env:AZURE_CLIENT_ID) + @($roles.value | Where-Object { $_.properties.roleDefinitionId -like '*/b86a8fe4-44ce-4948-aee5-eccb2c155cd7' } | ForEach-Object { $_.properties.principalId })
+              foreach ($write in @($activity.value | Where-Object { $_.operationName.value -eq 'Microsoft.KeyVault/vaults/write' -and $_.status.value -eq 'Succeeded' })) {
+                $matchesDeployer = $write.caller -in $deploymentPrincipals -or $write.claims.appid -eq $Env:AZURE_CLIENT_ID
+                "Vault write: time=$($write.eventTimestamp); matchesDeploymentIdentity=$matchesDeployer." |
+                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              }
+              "Vault activity records: $(@($activity.value).Count); more pages: $(-not [string]::IsNullOrWhiteSpace($activity.nextLink))." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
               $policyUri = "$vaultUri/providers/Microsoft.PolicyInsights/policyStates/latest/queryResults?api-version=2019-10-01"
               $policyStates = Invoke-RestMethod -Method Post -Uri $policyUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
               "Vault policy records: $(@($policyStates.value).Count); more pages: $(-not [string]::IsNullOrWhiteSpace($policyStates.'@odata.nextLink'))." |
@@ -353,7 +369,7 @@ jobs:
                 Format-List
             }
           } finally {
-            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment, activity, write -Force -ErrorAction SilentlyContinue
             if ($logZipPath -and (Test-Path -LiteralPath $logZipPath)) {
               Remove-Item -LiteralPath $logZipPath -Force
             }
