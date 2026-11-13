@@ -180,7 +180,7 @@ For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only 
 
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 
-On failure, the checker reports unresolved reference names and statuses, failed HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
+On failure, the checker reports unresolved reference names and statuses, failed management or HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. Reference-status transport failures retry within the existing readiness limit and are not reported as confirmed reference failures. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
 
 Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
 

@@ -132,15 +132,25 @@ try {
     $ready = $false
     for ($attempt = 1; $attempt -le $RetryCount; $attempt++) {
         $unresolved = @()
+        $referenceRequestFailed = $false
         foreach ($referenceName in $referenceNames) {
-            $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            try {
+                $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+                throw
+            } catch [System.IO.IOException], [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
+                $referenceRequestFailed = $true
+                $unresolved += "$referenceName=ManagementRequestFailed"
+                Write-Warning "The Azure management request failed for $referenceName on attempt ${attempt}. Retrying within the configured readiness limit."
+                break
+            }
             if ($reference.properties.status -ne 'Resolved') {
                 $unresolved += "$referenceName=$($reference.properties.status)"
             }
         }
 
         $ready = $false
-        $readinessStatus = 'Key Vault references are unresolved.'
+        $readinessStatus = if ($referenceRequestFailed) { 'Key Vault reference status request failed.' } else { 'Key Vault references are unresolved.' }
         if ($unresolved.Count -eq 0) {
             try {
                 $response = Invoke-WebRequest -Uri "https://$($app.properties.defaultHostName)/" -SkipHttpErrorCheck -TimeoutSec 30
@@ -159,13 +169,13 @@ try {
         if ($ready) {
             break
         }
-        Write-Information "Readiness attempt $attempt/$RetryCount. $readinessStatus Unresolved references: $($unresolved -join ', ')." -InformationAction Continue
+        Write-Information "Readiness attempt $attempt/$RetryCount. $readinessStatus Unresolved or unchecked references: $($unresolved -join ', ')." -InformationAction Continue
         if ($attempt -lt $RetryCount) {
             Start-Sleep -Seconds $RetryIntervalSeconds
         }
     }
     if (-not $ready) {
-        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts. Last readiness result: $readinessStatus Unresolved references: $($unresolved -join ', ')."
+        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts. Last readiness result: $readinessStatus Unresolved or unchecked references: $($unresolved -join ', ')."
     }
     if (-not $runtimeMountVerified) {
         Write-Warning 'Runtime /data mount verification is BLOCKED: supply mountinfo from the application container. Routing, configuration, and HTTP readiness do not prove the mount.'

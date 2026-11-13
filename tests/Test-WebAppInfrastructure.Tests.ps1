@@ -137,6 +137,40 @@ Describe 'Test Web App checks' {
         Should -Invoke Invoke-WebRequest -Times 1 -Exactly
     }
 
+    It 'retries a reset management connection within the readiness limit' {
+        Mock Invoke-RestMethod {
+            $referenceState.Reads++
+            if ($referenceState.Reads -eq 1) {
+                throw [System.IO.IOException]::new('Connection reset by peer.')
+            }
+            @{ properties = @{ status = 'Resolved' } }
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        (& $checkScript @checkParameters).KeyVaultReferencesVerified | Should -BeTrue
+        Should -Invoke Start-Sleep -Times 1 -Exactly
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*management request failed*FOUNDRY_USERNAME*' }
+    }
+
+    It 'reports an unreadable reference status when management connections keep resetting' {
+        Mock Invoke-RestMethod {
+            throw [System.IO.IOException]::new('Connection reset by peer.')
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: Key Vault reference status request failed.*FOUNDRY_USERNAME=ManagementRequestFailed*'
+        Should -Invoke Invoke-RestMethod -Times 2 -Exactly -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        Should -Invoke Start-Sleep -Times 1 -Exactly
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
+    It 'does not treat a management permission error as a reset connection' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Management access forbidden.', $response)
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        { & $checkScript @checkParameters } | Should -Throw '*Management access forbidden*'
+        Should -Invoke Start-Sleep -Times 0 -Exactly
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
     It 'does not accept an HTTP 200 platform page as Foundry readiness' {
         Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>private-response-marker' } }
         { & $checkScript @checkParameters } |
