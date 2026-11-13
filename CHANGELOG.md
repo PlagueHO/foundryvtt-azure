@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Added a separate Copilot code review setup without Azure login so reviews do not fail when Azure login inputs are missing. The shared cloud-agent setup remains unchanged. Fixes #61.
 - Set the Foundry Web App's `outboundVnetRouting.allTraffic` AVM parameter to `effectiveDeployNetworking` instead of the old nested `siteConfig.vnetRouteAllEnabled` setting. This configures routing for private Key Vault access and the Azure Files mount without changing networking-disabled deployments. Relates to #59.
 
 ## [2.0.0] - 2025-05-24

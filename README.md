@@ -387,6 +387,14 @@ Once you have configured the GitHub Actions workflow, you can trigger it manuall
 
 Contributions are welcome! Please open issues or pull requests.
 
+### Copilot code review setup
+
+Copilot code review uses [.github/workflows/copilot-code-review.yml](.github/workflows/copilot-code-review.yml) instead of the shared Copilot setup. The review setup checks out the repository with `contents: read` permission. It does not sign in to Azure or require Azure secrets. Live Azure checks remain in the deployment and test workflows.
+
+The shared [.github/workflows/copilot-setup-steps.yml](.github/workflows/copilot-setup-steps.yml) remains unchanged for Copilot cloud agent. See [GitHub: Customize Copilot code review's environment](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-code-review#customizing-copilot-code-reviews-environment).
+
+The review setup runs when its workflow file changes. After the file reaches the default branch, you can also run it from the **Actions** tab. Request a fresh Copilot review to confirm that the review uses the separate setup without an Azure login step.
+
 ### Dependency maintenance
 
 Dependabot follows the `dependabot-monthly-v1` policy. Routine version updates are scheduled for the first calendar day of each month, including weekends, at 09:00 `Pacific/Auckland`; GitHub queueing may delay when checks actually start. Minor and patch updates are grouped per configured ecosystem and directory as `devcontainers-minor-and-patch` or `github-actions-minor-and-patch`; major updates remain separate pull requests on the same monthly schedule. A three-day release-age cooldown applies to routine updates.

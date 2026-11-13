@@ -1,0 +1,23 @@
+name: Copilot Code Review Setup
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-code-review.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-code-review.yml
+
+permissions:
+  contents: read
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
