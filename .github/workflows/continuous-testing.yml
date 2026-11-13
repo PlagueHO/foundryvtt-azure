@@ -211,7 +211,7 @@ jobs:
             $resourceId = "/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$Env:DIAGNOSTIC_ENV_NAME/providers/Microsoft.KeyVault/vaults/$vaultName"
             $filter = [uri]::EscapeDataString("ResourceId eq '$resourceId' and PolicyDefinitionAction eq 'modify'")
             $from = [uri]::EscapeDataString([DateTime]::UtcNow.AddDays(-1).ToString('o'))
-            $uri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.PolicyInsights/policyStates/all/queryResults?api-version=2019-10-01&`$filter=$filter&`$from=$from&`$top=100"
+            $uri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.PolicyInsights/policyStates/default/queryResults?api-version=2019-10-01&`$filter=$filter&`$from=$from&`$top=100"
             $states = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
             if (-not [string]::IsNullOrWhiteSpace($states.'@odata.nextLink')) {
               throw 'More than 100 matching policy states exist. The policy inspection is incomplete.'
