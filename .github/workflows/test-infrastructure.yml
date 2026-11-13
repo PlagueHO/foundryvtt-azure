@@ -293,8 +293,22 @@ jobs:
             }
             $headers = @{ Authorization = "Bearer $token" }
             $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
+            $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+            $storageUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Storage/storageAccounts/$storageAccountName"
+            $storageAccount = Invoke-RestMethod -Uri "$storageUri`?api-version=2025-06-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $connections = @($storageAccount.properties.privateEndpointConnections)
+            $approved = @($connections | Where-Object { $_.properties.privateLinkServiceConnectionState.status -eq 'Approved' })
+            "Storage access: publicNetworkAccess=$($storageAccount.properties.publicNetworkAccess); allowSharedKeyAccess=$($storageAccount.properties.allowSharedKeyAccess); approvedPrivateEndpoints=$($approved.Count)/$($connections.Count)." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            $fileService = Invoke-RestMethod -Uri "$storageUri/fileServices/default?api-version=2025-06-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            "Storage SMB settings: versions=$($fileService.properties.protocolSettings.smb.versions); authenticationMethods=$($fileService.properties.protocolSettings.smb.authenticationMethods); channelEncryption=$($fileService.properties.protocolSettings.smb.channelEncryption)." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            $mount = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $expectedKeyReference = $mount.properties.foundrydata.accessKey -eq '@AppSettingRef(STORAGE_ACCOUNT_KEY)'
+            "Storage mapping: state=$($mount.properties.foundrydata.state); expectedKeyReference=$expectedKeyReference." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
             if ('${{ inputs.CHECK_MOUNT_STARTUP_ORDER }}' -eq 'true') {
-              $mount = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
               "Mount state after startup comparison: $($mount.properties.foundrydata.state)." |
                 Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
             }
@@ -471,7 +485,7 @@ jobs:
                 Format-List
             }
           } finally {
-            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment, activity, write, mount -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment, activity, write, mount, storageAccount, fileService -Force -ErrorAction SilentlyContinue
             if ($logZipPath -and (Test-Path -LiteralPath $logZipPath)) {
               Remove-Item -LiteralPath $logZipPath -Force
             }
