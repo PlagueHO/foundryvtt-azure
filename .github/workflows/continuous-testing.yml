@@ -14,9 +14,13 @@ on:
         description: "Run only the two sequential Web App tests. Paid resources require separate approval."
         type: boolean
         default: false
+      DIAGNOSTIC_ENV_NAME:
+        description: "Read logs from an existing fvtt-asp-on/off test environment. Does not deploy or delete resources."
+        type: string
+        default: ''
 
 concurrency:
-  group: foundry-infrastructure-tests
+  group: ${{ inputs.DIAGNOSTIC_ENV_NAME && format('foundry-diagnostics-{0}', inputs.DIAGNOSTIC_ENV_NAME) || 'foundry-infrastructure-tests' }}
   cancel-in-progress: false
   
 permissions:
@@ -27,6 +31,7 @@ permissions:
 
 jobs:
   lint-and-publish-bicep:
+    if: inputs.DIAGNOSTIC_ENV_NAME == ''
     uses: ./.github/workflows/lint-and-publish-bicep.yml
 
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
@@ -106,6 +111,24 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
       # This deployment can fail with '(403) Forbidden.' when tenant policy blocks storage accounts with public endpoints.
       ALLOW_STORAGE_POLICY_403_FORBIDDEN: true
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+  diagnose-webapp:
+    name: Read Existing Web App Test Diagnostics
+    if: inputs.DIAGNOSTIC_ENV_NAME != ''
+    uses: ./.github/workflows/test-infrastructure.yml
+    with:
+      ENVIRONMENT: WebApp
+      AZURE_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-{0}', inputs.DIAGNOSTIC_ENV_NAME) }}
+      AZURE_COMPUTE_SERVICE: 'Web App'
+      DIAGNOSTICS_ONLY: true
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

@@ -36,6 +36,10 @@ on:
         description: "Override the optional proxy with 'true' or 'false'. Otherwise use the environment variable."
         required: false
         type: string
+      DIAGNOSTICS_ONLY:
+        description: "Read existing isolated Web App test logs without deploying or deleting resources."
+        type: boolean
+        default: false
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
@@ -123,6 +127,7 @@ jobs:
         shell: pwsh
 
       - name: Provision Infrastructure
+        if: ${{ !inputs.DIAGNOSTICS_ONLY }}
         id: provision
         timeout-minutes: 20
         shell: pwsh
@@ -145,7 +150,7 @@ jobs:
           }
           
       - name: Check Web App routing, references, and HTTP readiness
-        if: env.AZURE_COMPUTE_SERVICE == 'Web App'
+        if: ${{ !inputs.DIAGNOSTICS_ONLY && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
         timeout-minutes: 40
         shell: pwsh
         run: |
@@ -171,7 +176,7 @@ jobs:
           }
 
       - name: Report Web App container diagnostic categories
-        if: ${{ always() && steps.provision.outcome == 'success' && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
+        if: ${{ always() && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
         timeout-minutes: 3
         shell: pwsh
         run: |
@@ -181,13 +186,24 @@ jobs:
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
               throw 'Cannot obtain a token for test container diagnostics.'
             }
-            $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupName)) {
-              throw 'Cannot read the isolated test resource group.'
+            if ('${{ inputs.DIAGNOSTICS_ONLY }}' -eq 'true') {
+              if ($Env:AZURE_ENV_NAME -notmatch '^fvtt-asp-(on|off)-\d+-\d+$' -or
+                  $Env:AZURE_RESOURCE_GROUP_NAME -ne "rg-$Env:AZURE_ENV_NAME") {
+                throw 'Diagnostics-only access is limited to isolated Web App test names.'
+              }
+              $resourceGroupName = $Env:AZURE_RESOURCE_GROUP_NAME
+            } else {
+              $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
+              if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupName)) {
+                throw 'Cannot read the isolated test resource group.'
+              }
             }
             $headers = @{ Authorization = "Bearer $token" }
             $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
-            $logs = Invoke-RestMethod -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60
+            $logs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60 -MaximumRetryCount 3 -RetryIntervalSec 5
+            if ([string]::IsNullOrWhiteSpace($logs)) {
+              throw 'The container log endpoint returned no diagnostic content.'
+            }
             $categories = [ordered]@{
               'Azure Files mount failure' = 'BYOSFailure|failed to mount|mount error|permission denied'
               'Container image pull failure' = 'ImagePullFailure|failed to pull|unauthorized: authentication required'
@@ -208,6 +224,6 @@ jobs:
 
       - name: Delete Infrastructure
         id: cleanup
-        if: always()
+        if: ${{ always() && !inputs.DIAGNOSTICS_ONLY }}
         timeout-minutes: 15
         run: azd down --no-prompt --purge --force

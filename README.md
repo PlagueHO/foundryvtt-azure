@@ -174,6 +174,8 @@ Obtain approval for the test subscription, region, resource limits, cost limit, 
 
 For an approved Web App-only run, dispatch `continuous-testing.yml` with `WEB_APP_ONLY=true`. The optional proxy and other compute modes are skipped. The second Web App case starts only after the first case's cleanup succeeds, including when its readiness check fails. Test steps have time limits and cleanup always runs.
 
+To read container diagnostic categories while a test is running, dispatch the same workflow with `DIAGNOSTIC_ENV_NAME` set to its exact `fvtt-asp-on-<run-id>-<attempt>` or `fvtt-asp-off-<run-id>-<attempt>` name. This mode does not deploy or delete resources. It uses the WebApp environment identity and rejects other environment names.
+
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 
 On failure, the checker reports unresolved references, failed HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.

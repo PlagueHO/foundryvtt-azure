@@ -100,7 +100,7 @@ try {
     }
     $headers = @{ Authorization = "Bearer $token" }
 
-    $app = Invoke-RestMethod -Uri "$appUri`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+    $app = Invoke-RestMethod -Uri "$appUri`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
     if ($app.properties.outboundVnetRouting.allTraffic -ne $expectedRouting) {
         throw "The Web App allTraffic routing setting does not match Networking=$Networking."
     }
@@ -112,7 +112,7 @@ try {
         throw 'The Web App response has no default hostname.'
     }
 
-    $storage = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+    $storage = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
     $mount = $storage.properties.foundrydata
     if ($mount.accountName -ne $StorageAccountName -or $mount.shareName -ne 'foundryvttdata' -or
         $mount.mountPath -ne '/data' -or $mount.type -ne 'AzureFiles' -or $mount.protocol -ne 'Smb') {
@@ -133,7 +133,7 @@ try {
     for ($attempt = 1; $attempt -le $RetryCount; $attempt++) {
         $unresolved = @()
         foreach ($referenceName in $referenceNames) {
-            $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+            $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
             if ($reference.properties.status -ne 'Resolved') {
                 $unresolved += $referenceName
             }
