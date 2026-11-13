@@ -30,6 +30,13 @@ Describe 'Compiled Foundry Web App routing' {
         ($deployment.properties.parameters.siteConfig.value.PSObject.Properties.Name -contains 'vnetRouteAllEnabled') |
             Should -BeFalse
     }
+
+    It 'sets Key Vault public access explicitly for both networking modes' {
+        $template.resources.keyVault.properties.parameters.publicNetworkAccess |
+            Should -Be "[if(variables('effectiveDeployNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]"
+        $template.resources.keyVault.properties.parameters.networkAcls.value.defaultAction |
+            Should -Be "[if(variables('effectiveDeployNetworking'), 'Deny', 'Allow')]"
+    }
 }
 
 Describe 'Test Web App checks' {
@@ -113,7 +120,7 @@ Describe 'Test Web App checks' {
     It 'stops after the retry limit when any Key Vault reference remains unresolved' {
         $referenceState.Status = 'AccessToKeyVaultDenied'
         { & $checkScript @checkParameters } |
-            Should -Throw '*within 2 attempts*Last readiness result: Key Vault references are unresolved.*FOUNDRY_USERNAME*STORAGE_ACCOUNT_KEY*'
+            Should -Throw '*within 2 attempts*Last readiness result: Key Vault references are unresolved.*FOUNDRY_USERNAME=AccessToKeyVaultDenied*STORAGE_ACCOUNT_KEY=AccessToKeyVaultDenied*'
         Should -Invoke Invoke-RestMethod -Times 8 -Exactly -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
         Should -Invoke Start-Sleep -Times 1 -Exactly
         Should -Invoke Invoke-WebRequest -Times 0 -Exactly

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.36.1.42791",
-      "templateHash": "7304788222109765623"
+      "templateHash": "10802576000121888025"
     }
   },
   "parameters": {
@@ -23522,6 +23522,7 @@
               }
             ]
           },
+          "publicNetworkAccess": "[if(variables('effectiveDeployNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]",
           "networkAcls": {
             "value": {
               "defaultAction": "[if(variables('effectiveDeployNetworking'), 'Deny', 'Allow')]",

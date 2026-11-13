@@ -34,7 +34,26 @@ permissions:
   pull-requests: write
 
 jobs:
+  validate-inputs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate diagnostic selection before Azure access
+        shell: pwsh
+        env:
+          DIAGNOSTIC_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
+          CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
+        run: |
+          if ($Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -and [string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME)) {
+            throw 'Mount evidence capture requires an existing isolated test environment name. No deployment was started.'
+          }
+          if (-not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME) -and $Env:DIAGNOSTIC_ENV_NAME -notmatch '^fvtt-asp-(on|off)-\d+-\d+$') {
+            throw 'Diagnostics are limited to existing isolated Web App test names.'
+          }
+
   lint-and-publish-bicep:
+    needs: validate-inputs
     if: inputs.DIAGNOSTIC_ENV_NAME == ''
     uses: ./.github/workflows/lint-and-publish-bicep.yml
 
@@ -125,6 +144,7 @@ jobs:
 
   diagnose-webapp:
     name: Read Existing Web App Test Diagnostics
+    needs: validate-inputs
     if: inputs.DIAGNOSTIC_ENV_NAME != ''
     uses: ./.github/workflows/test-infrastructure.yml
     with:

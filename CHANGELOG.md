@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added Web App-only test selection, bounded test steps, cleanup-gated sequential tests, and container diagnostic categories without raw log output.
+- Added Web App-only test selection, bounded test steps, cleanup-gated sequential tests, and container diagnostic categories without raw log output. Existing isolated tests also support read-only access checks and opt-in application-container mount evidence capture.
 - Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
 - Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.
@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Improved Web App test failure messages to distinguish unresolved Key Vault references, HTTP request failures, HTTP status errors, and responses that do not identify Foundry. HTTP response bodies are not printed.
+- Set Key Vault public access explicitly from the effective networking flag. Private deployments disable public access; deployments without networking use the intended authenticated public endpoint.
+- Improved Web App test failure messages to distinguish unresolved Key Vault reference statuses, HTTP request failures, HTTP status errors, and responses that do not identify Foundry. HTTP response bodies are not printed.
+- Corrected App Service log requests to use POST and added bounded retries for Azure management requests. Invalid mount-capture selections fail before deployment.
 - Added a separate Copilot code review setup without Azure login so reviews do not fail when Azure login inputs are missing. The shared cloud-agent setup remains unchanged. Fixes #61.
 - Set the Foundry Web App's `outboundVnetRouting.allTraffic` AVM parameter to `effectiveDeployNetworking` instead of the old nested `siteConfig.vnetRouteAllEnabled` setting. This configures routing for private Key Vault access and the Azure Files mount without changing networking-disabled deployments. Relates to #59.
 

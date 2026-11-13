@@ -135,7 +135,7 @@ try {
         foreach ($referenceName in $referenceNames) {
             $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
             if ($reference.properties.status -ne 'Resolved') {
-                $unresolved += $referenceName
+                $unresolved += "$referenceName=$($reference.properties.status)"
             }
         }
 

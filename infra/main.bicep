@@ -454,6 +454,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.14.2' = {
         value: foundryAdminKey
       }
     ]
+    publicNetworkAccess: effectiveDeployNetworking ? 'Disabled' : 'Enabled'
     networkAcls: { // Restrict public access if VNet deployed, otherwise allow (as PEs won't exist)
       defaultAction: effectiveDeployNetworking ? 'Deny' : 'Allow'
       bypass: 'AzureServices'

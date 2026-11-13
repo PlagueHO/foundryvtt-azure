@@ -166,7 +166,7 @@ For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
 For the Foundry Web App, `AZURE_DEPLOY_NETWORKING=true` sets the AVM module parameter `outboundVnetRouting.allTraffic` to `true`. This routes application and configuration traffic through VNet integration, including Key Vault access and content-share traffic. The template does not use the old nested `siteConfig.vnetRouteAllEnabled` setting. See [App Service VNet routing](https://learn.microsoft.com/azure/app-service/configure-vnet-integration-routing).
 
-With networking disabled, `allTraffic` is `false` and the app has no VNet integration. Existing public-endpoint behaviour is unchanged. Do not enable public storage access to work around a failed private mount.
+With networking disabled, `allTraffic` is `false` and the app has no VNet integration. Key Vault public access is explicitly disabled with networking enabled and enabled with networking disabled. This preserves the intended public-endpoint behaviour without relying on a module or service default. Key Vault still requires authentication and the assigned secrets role in both modes. Do not enable public storage access to work around a failed private mount.
 
 ### Verify an isolated Web App test
 
@@ -174,13 +174,13 @@ Obtain approval for the test subscription, region, resource limits, cost limit, 
 
 For an approved Web App-only run, dispatch `continuous-testing.yml` with `WEB_APP_ONLY=true`. The optional proxy and other compute modes are skipped. The second Web App case starts only after the first case's cleanup succeeds, including when its readiness check fails. Test steps have time limits and cleanup always runs.
 
-To read container diagnostic categories while a test is running, dispatch the same workflow with `DIAGNOSTIC_ENV_NAME` set to its exact `fvtt-asp-on-<run-id>-<attempt>` or `fvtt-asp-off-<run-id>-<attempt>` name. This mode does not deploy or delete resources. It uses the WebApp environment identity and rejects other environment names.
+To read container diagnostic categories while a test is running, dispatch the same workflow with `DIAGNOSTIC_ENV_NAME` set to its exact `fvtt-asp-on-<run-id>-<attempt>` or `fvtt-asp-off-<run-id>-<attempt>` name. This mode does not deploy or delete resources. It reports reference statuses, vault access settings, and whether the app has the expected secrets role. It uses the WebApp environment identity and rejects other environment names.
 
-For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only Node preload that reports the application's `/data` mount entry. This changes test app settings, restarts that app, refreshes its Key Vault references, and reapplies the same mount mapping after the storage key reference resolves. It does not change the image. The workflow saves only mount evidence, not raw container logs. A test that passes only after this diagnostic change does not prove that the unchanged deployment starts correctly.
+For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only Node preload that reports the application's `/data` mount entry. This option requires an existing diagnostic environment name; invalid input fails before Azure access or deployment. Capture changes test app settings, restarts that app, refreshes its Key Vault references, and reapplies the same mount mapping only after the storage key reference resolves within a bounded wait. It does not change the image. The workflow saves only mount evidence, not raw container logs. A test that passes only after this diagnostic change does not prove that the unchanged deployment starts correctly.
 
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 
-On failure, the checker reports unresolved references, failed HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
+On failure, the checker reports unresolved reference names and statuses, failed HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
 
 Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
 
