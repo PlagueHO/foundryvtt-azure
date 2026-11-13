@@ -225,6 +225,21 @@ jobs:
             $vaultDeployment = Invoke-RestMethod -Uri "$deploymentUri`?api-version=2022-09-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
             "Key Vault deployment input: publicNetworkAccess=$($vaultDeployment.properties.parameters.publicNetworkAccess.value); defaultAction=$($vaultDeployment.properties.parameters.networkAcls.value.defaultAction)." |
               Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            if ($vaultDeployment.properties.parameters.publicNetworkAccess.value -eq 'Enabled' -and $vault.properties.publicNetworkAccess -eq 'Disabled') {
+              $policyUri = "$vaultUri/providers/Microsoft.PolicyInsights/policyStates/latest/queryResults?api-version=2019-10-01"
+              $policyStates = Invoke-RestMethod -Method Post -Uri $policyUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              "Vault policy records: $(@($policyStates.value).Count); more pages: $(-not [string]::IsNullOrWhiteSpace($policyStates.'@odata.nextLink'))." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              $changingPolicies = @($policyStates.value | Where-Object { $_.policyDefinitionAction -in @('modify', 'deployIfNotExists') })
+              if ($changingPolicies.Count -gt 20) { throw 'More than 20 changing policies affect the test vault. Inspect them in Azure before continuing.' }
+              foreach ($policy in $changingPolicies) {
+                $definitionUri = "https://management.azure.com$($policy.policyDefinitionId)?api-version=2023-04-01"
+                $definition = Invoke-RestMethod -Uri $definitionUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+                $targetsPublicAccess = ($definition.properties.policyRule | ConvertTo-Json -Depth 30 -Compress) -match 'Microsoft\.KeyVault/vaults/publicNetworkAccess'
+                "Vault changing policy: action=$($policy.policyDefinitionAction); compliance=$($policy.complianceState); targetsPublicAccess=$targetsPublicAccess." |
+                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              }
+            }
             if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
               if ('${{ inputs.DIAGNOSTICS_ONLY }}' -ne 'true') {
                 throw 'Mount evidence capture requires the existing isolated test diagnostics mode.'
