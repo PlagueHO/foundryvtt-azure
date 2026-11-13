@@ -40,6 +40,10 @@ on:
         description: "Read existing isolated Web App test logs without deploying or deleting resources."
         type: boolean
         default: false
+      CAPTURE_MOUNT_EVIDENCE:
+        description: "Add a Node mount probe and refresh references in an existing isolated test app only."
+        type: boolean
+        default: false
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
@@ -177,7 +181,7 @@ jobs:
 
       - name: Report Web App container diagnostic categories
         if: ${{ always() && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
-        timeout-minutes: 3
+        timeout-minutes: 10
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -200,6 +204,43 @@ jobs:
             }
             $headers = @{ Authorization = "Bearer $token" }
             $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
+              if ('${{ inputs.DIAGNOSTICS_ONLY }}' -ne 'true') {
+                throw 'Mount evidence capture requires the existing isolated test diagnostics mode.'
+              }
+              $settings = Invoke-RestMethod -Method Post -Uri "$appUri/config/appsettings/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              if ($settings.properties.PSObject.Properties.Name -contains 'NODE_OPTIONS') {
+                throw 'The test app already has NODE_OPTIONS. Refusing to replace it.'
+              }
+              $probe = 'import{readFileSync}from"node:fs";const m=readFileSync("/proc/self/mountinfo","utf8").split("\n").filter(x=>x.split(" ")[4]==="/data").join("\n").replace(/(?:password|pass|key|secret)=[^,\s]*/gi,"[redacted]");console.error("FVTT_MOUNTINFO:"+Buffer.from(m).toString("base64"));'
+              $nodeOptions = '--import=data:text/javascript;base64,' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($probe))
+              $settings.properties | Add-Member -NotePropertyName NODE_OPTIONS -NotePropertyValue $nodeOptions
+              $body = @{ properties = $settings.properties } | ConvertTo-Json -Depth 10
+              Invoke-RestMethod -Method Put -Uri "$appUri/config/appsettings?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+              Invoke-RestMethod -Method Post -Uri "$appUri/config/configreferences/appsettings/refresh?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+              $mountInfoPath = Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-mountinfo.txt"
+              for ($attempt = 1; $attempt -le 12; $attempt++) {
+                $probeLogs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+                $evidence = [regex]::Matches([string]$probeLogs, 'FVTT_MOUNTINFO:([A-Za-z0-9+/=]+)')
+                if ($evidence.Count -gt 0) {
+                  [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($evidence[-1].Groups[1].Value)) |
+                    Set-Content -LiteralPath $mountInfoPath
+                  break
+                }
+                Start-Sleep -Seconds 15
+              }
+              if (-not (Test-Path -LiteralPath $mountInfoPath)) {
+                throw 'No application-container mount evidence was returned within the probe limit.'
+              }
+              $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
+              $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+              $networking = if ($Env:AZURE_ENV_NAME -match '^fvtt-asp-on-') { 'Enabled' } else { 'Disabled' }
+              & ./scripts/Test-WebAppInfrastructure.ps1 -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID `
+                -TenantId $Env:AZURE_TENANT_ID -ResourceGroupName $resourceGroupName `
+                -WebAppName $Env:AZURE_ENV_NAME -StorageAccountName $storageAccountName `
+                -Networking $networking -MountInfoPath $mountInfoPath -RetryCount 2 -RetryIntervalSeconds 5 |
+                Format-List
+            }
             $logs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60 -MaximumRetryCount 3 -RetryIntervalSec 5
             if ([string]::IsNullOrWhiteSpace($logs)) {
               throw 'The container log endpoint returned no diagnostic content.'
@@ -219,8 +260,17 @@ jobs:
             'Only fixed diagnostic categories were reported. Raw container logs were not printed.' |
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           } finally {
-            Remove-Variable -Name token, headers, logs -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs -Force -ErrorAction SilentlyContinue
           }
+
+      - name: Preserve application-container mount evidence
+        if: ${{ always() && inputs.DIAGNOSTICS_ONLY && inputs.CAPTURE_MOUNT_EVIDENCE }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: webapp-runtime-mount-${{ env.AZURE_ENV_NAME }}
+          path: ${{ runner.temp }}/${{ env.AZURE_ENV_NAME }}-mountinfo.txt
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Delete Infrastructure
         id: cleanup

@@ -18,6 +18,10 @@ on:
         description: "Read logs from an existing fvtt-asp-on/off test environment. Does not deploy or delete resources."
         type: string
         default: ''
+      CAPTURE_MOUNT_EVIDENCE:
+        description: "For an existing test only: add a Node mount probe and refresh Key Vault references. Restarts the test app."
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ inputs.DIAGNOSTIC_ENV_NAME && format('foundry-diagnostics-{0}', inputs.DIAGNOSTIC_ENV_NAME) || 'foundry-infrastructure-tests' }}
@@ -129,6 +133,7 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-{0}', inputs.DIAGNOSTIC_ENV_NAME) }}
       AZURE_COMPUTE_SERVICE: 'Web App'
       DIAGNOSTICS_ONLY: true
+      CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
