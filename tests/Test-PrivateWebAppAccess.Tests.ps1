@@ -9,12 +9,17 @@ BeforeAll {
         WhatIf = $true
     }
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($privateScript, [ref]$null, [ref]$null)
-    $probeFunction = $ast.Find({
-        param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-TestProbe'
-    }, $false)
-    . ([scriptblock]::Create($probeFunction.Extent.Text))
-    function Get-TestLog { param([string]$Phase) throw "Unexpected log access in phase $Phase." }
+    foreach ($functionName in @('Get-TestLog', 'Get-TestProbe')) {
+        $functionAst = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName
+        }, $false)
+        . ([scriptblock]::Create($functionAst.Extent.Text))
+    }
+    function Invoke-TestManagementRequest {
+        param([string]$ResourceId, [string]$Method)
+        throw "Unexpected management request: $Method $ResourceId"
+    }
     function Write-TestEvidence { param([string]$Message) throw "Unexpected evidence write: $Message" }
 }
 
@@ -29,6 +34,38 @@ Describe 'Private access test scope' {
         $invalid = $script:parameters.Clone()
         $invalid.ResourceGroupName = 'rg-production'
         { & $privateScript @invalid } | Should -Throw '*does not match the isolated private test*'
+    }
+}
+
+Describe 'Private access log collection' {
+    BeforeEach {
+        $script:appId = '/subscriptions/test/resourceGroups/rg-fvtt-asp-on-123-1/providers/Microsoft.Web/sites/fvtt-asp-on-123-1'
+        Mock Write-TestEvidence {}
+    }
+
+    It 'reports <FailureType> as unavailable without blocking access diagnosis' -TestCases @(
+        @{ FailureType = [System.Threading.Tasks.TaskCanceledException] }
+        @{ FailureType = [System.Net.Http.HttpRequestException] }
+        @{ FailureType = [System.Net.WebException] }
+    ) {
+        param($FailureType)
+        $script:logFailureType = $FailureType
+        Mock Invoke-TestManagementRequest {
+            throw [Activator]::CreateInstance($script:logFailureType, 'Private log transport failed.')
+        }
+        Get-TestLog -Phase Baseline | Should -BeNullOrEmpty
+        Should -Invoke Write-TestEvidence -Times 1 -Exactly -ParameterFilter {
+            $Message -like '*unavailable (transport failure or timeout)*No access or mount claim*'
+        }
+    }
+
+    It 'preserves management permission errors' {
+        Mock Invoke-TestManagementRequest {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Management access forbidden.', $response)
+        }
+        { Get-TestLog -Phase Baseline } | Should -Throw '*Management access forbidden*'
+        Should -Invoke Write-TestEvidence -Times 0 -Exactly
     }
 }
 

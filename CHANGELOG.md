@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added a separately approved private access test that captures network and identity evidence before cleanup, enables filesystem logs, and uses a temporary test-mount control to check private DNS, TCP 445, and signed storage access from the same application container.
-- Added read-only inspection of retained policy operations for an exact test vault and selected storage access evaluations after cleanup, without provisioning resources or changing access.
+- Added read-only inspection of retained policy operations for an exact test vault and storage account, plus selected storage access evaluations after cleanup, without provisioning resources or changing access.
 - Added a separately approved private-only startup comparison that records mount state and checks readiness after unchanged mapping replay, before adding a container mount probe.
 - Added Web App-only test selection, bounded test steps, cleanup-gated sequential tests, and container diagnostic categories without raw log output. Existing isolated tests also support read-only access checks and opt-in application-container mount evidence capture.
 - Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Private access tests now restore the mapping before the restored probe starts and wait past mount-free startup results. A failed signed storage request no longer implies an identity or authentication cause.
+- Private access tests record resolved secret status before optional log collection. Log transport failures are reported as unavailable instead of stopping the remaining access checks; permission errors still fail explicitly.
 - Set Key Vault public access explicitly from the effective networking flag. Private deployments disable public access; deployments without networking use the intended authenticated public endpoint.
 - Improved Web App test failure messages to distinguish unresolved Key Vault reference statuses, HTTP request failures, HTTP status errors, and responses that do not identify Foundry. HTTP response bodies are not printed.
 - Corrected App Service log requests to use POST and added bounded retries for Azure management requests. Reference-status transport failures use the existing readiness retry limit instead of ending the test at the first reset connection. Invalid mount-capture selections fail before deployment.

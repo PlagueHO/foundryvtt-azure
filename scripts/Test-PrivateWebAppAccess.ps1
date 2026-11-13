@@ -98,6 +98,9 @@ function Get-TestLog {
         if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
         Write-TestEvidence "${Phase} container logs: unavailable (HTTP 404)."
         return $null
+    } catch [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
+        Write-TestEvidence "${Phase} container logs: unavailable (transport failure or timeout). No access or mount claim was made."
+        return $null
     }
 }
 
@@ -235,7 +238,6 @@ try {
         if (-not $_.Exception.Message.StartsWith('The test Web App did not resolve all four Key Vault references and serve Foundry within')) { throw }
         Write-TestEvidence 'Baseline readiness failed within 20 checks. The access evidence was captured before cleanup.'
     }
-    $null = Get-TestLog 'Baseline'
     foreach ($name in @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')) {
         $reference = Invoke-TestManagementRequest "$appId/config/configreferences/appsettings/$name"
         Write-TestEvidence "Baseline reference ${name}: status=$($reference.properties.status)."
@@ -244,6 +246,7 @@ try {
         }
     }
     Write-TestEvidence 'Identity classification: all four secrets resolve through the app identity. Missing Key Vault permission does not explain the remaining startup failure.'
+    $null = Get-TestLog 'Baseline'
     $originalSettings = Invoke-TestManagementRequest "$appId/config/appsettings/list" -Method Post
     if ($originalSettings.properties.PSObject.Properties.Name -contains 'NODE_OPTIONS') {
         throw 'The test already has NODE_OPTIONS. Refusing to replace it.'
