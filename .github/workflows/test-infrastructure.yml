@@ -209,15 +209,18 @@ jobs:
                 throw 'Mount evidence capture requires the existing isolated test diagnostics mode.'
               }
               $settings = Invoke-RestMethod -Method Post -Uri "$appUri/config/appsettings/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-              if ($settings.properties.PSObject.Properties.Name -contains 'NODE_OPTIONS') {
-                throw 'The test app already has NODE_OPTIONS. Refusing to replace it.'
-              }
               $probe = 'import{readFileSync}from"node:fs";const m=readFileSync("/proc/self/mountinfo","utf8").split("\n").filter(x=>x.split(" ")[4]==="/data").join("\n").replace(/(?:password|pass|key|secret)=[^,\s]*/gi,"[redacted]");console.error("FVTT_MOUNTINFO:"+Buffer.from(m).toString("base64"));'
               $nodeOptions = '--import=data:text/javascript;base64,' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($probe))
-              $settings.properties | Add-Member -NotePropertyName NODE_OPTIONS -NotePropertyValue $nodeOptions
-              $body = @{ properties = $settings.properties } | ConvertTo-Json -Depth 10
-              Invoke-RestMethod -Method Put -Uri "$appUri/config/appsettings?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
-              Invoke-RestMethod -Method Post -Uri "$appUri/config/configreferences/appsettings/refresh?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+              if ($settings.properties.PSObject.Properties.Name -contains 'NODE_OPTIONS') {
+                if ($settings.properties.NODE_OPTIONS -ne $nodeOptions) {
+                  throw 'The test app has different NODE_OPTIONS. Refusing to replace it.'
+                }
+              } else {
+                $settings.properties | Add-Member -NotePropertyName NODE_OPTIONS -NotePropertyValue $nodeOptions
+                $body = @{ properties = $settings.properties } | ConvertTo-Json -Depth 10
+                Invoke-RestMethod -Method Put -Uri "$appUri/config/appsettings?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+                Invoke-RestMethod -Method Post -Uri "$appUri/config/configreferences/appsettings/refresh?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+              }
               $mountInfoPath = Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-mountinfo.txt"
               for ($attempt = 1; $attempt -le 12; $attempt++) {
                 $probeLogs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
@@ -230,16 +233,32 @@ jobs:
                 Start-Sleep -Seconds 15
               }
               if (-not (Test-Path -LiteralPath $mountInfoPath)) {
-                throw 'No application-container mount evidence was returned within the probe limit.'
+                $logZipPath = Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-containerlogs.zip"
+                Invoke-WebRequest -Method Post -Uri "$appUri/containerlogs/zip/download?api-version=2025-03-01" -Headers $headers -OutFile $logZipPath -TimeoutSec 60 -MaximumRetryCount 3 -RetryIntervalSec 5
+                $archive = [IO.Compression.ZipFile]::OpenRead($logZipPath)
+                try {
+                  foreach ($entry in $archive.Entries) {
+                    if ($entry.Name -notlike '*.log') { continue }
+                    $reader = [IO.StreamReader]::new($entry.Open())
+                    try {
+                      $entryLogs = $reader.ReadToEnd()
+                      $evidence = [regex]::Matches($entryLogs, 'FVTT_MOUNTINFO:([A-Za-z0-9+/=]+)')
+                      if ($evidence.Count -gt 0) {
+                        [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($evidence[-1].Groups[1].Value)) |
+                          Set-Content -LiteralPath $mountInfoPath
+                        break
+                      }
+                    } finally {
+                      $reader.Dispose()
+                    }
+                  }
+                } finally {
+                  $archive.Dispose()
+                }
               }
               $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
               $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
               $networking = if ($Env:AZURE_ENV_NAME -match '^fvtt-asp-on-') { 'Enabled' } else { 'Disabled' }
-              & ./scripts/Test-WebAppInfrastructure.ps1 -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID `
-                -TenantId $Env:AZURE_TENANT_ID -ResourceGroupName $resourceGroupName `
-                -WebAppName $Env:AZURE_ENV_NAME -StorageAccountName $storageAccountName `
-                -Networking $networking -MountInfoPath $mountInfoPath -RetryCount 2 -RetryIntervalSeconds 5 |
-                Format-List
             }
             $logs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60 -MaximumRetryCount 3 -RetryIntervalSec 5
             if ([string]::IsNullOrWhiteSpace($logs)) {
@@ -248,7 +267,7 @@ jobs:
             $categories = [ordered]@{
               'Azure Files mount failure' = 'BYOSFailure|failed to mount|mount error|permission denied'
               'Container image pull failure' = 'ImagePullFailure|failed to pull|unauthorized: authentication required'
-              'Foundry authentication failure' = 'Authentication failed|Unable to authenticate'
+              'Authentication failure signal' = 'Authentication failed|Unable to authenticate'
               'Foundry download failure' = 'Unable to proceed with installation|Download from presigned URL failed'
               'Container startup failure' = 'ContainerStartFailure|did not respond to HTTP pings|container has exited'
               'Foundry launcher started' = 'Starting launcher'
@@ -259,8 +278,25 @@ jobs:
             }
             'Only fixed diagnostic categories were reported. Raw container logs were not printed.' |
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+            $failureTokens = [regex]::Matches([string]$logs, '(?i)mount error\(\d+\)|STATUS_[A-Z_]+|BYOSFailure|cifs_mount failed w/return code = -?\d+|AppSettingRef|KeyVaultReference|Authentication failed|invalid argument|permission denied') |
+              ForEach-Object Value | Sort-Object -Unique
+            "Recognized failure tokens: $($failureTokens -join ', ')" |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
+              if (-not (Test-Path -LiteralPath $mountInfoPath)) {
+                throw 'No application-container mount evidence was found in the log tail or archive.'
+              }
+              & ./scripts/Test-WebAppInfrastructure.ps1 -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID `
+                -TenantId $Env:AZURE_TENANT_ID -ResourceGroupName $resourceGroupName `
+                -WebAppName $Env:AZURE_ENV_NAME -StorageAccountName $storageAccountName `
+                -Networking $networking -MountInfoPath $mountInfoPath -RetryCount 2 -RetryIntervalSeconds 5 |
+                Format-List
+            }
           } finally {
-            Remove-Variable -Name token, headers, logs, settings, body, probeLogs -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs -Force -ErrorAction SilentlyContinue
+            if ($logZipPath -and (Test-Path -LiteralPath $logZipPath)) {
+              Remove-Item -LiteralPath $logZipPath -Force
+            }
           }
 
       - name: Preserve application-container mount evidence
