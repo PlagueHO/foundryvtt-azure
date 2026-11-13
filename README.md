@@ -176,7 +176,7 @@ For an approved Web App-only run, dispatch `continuous-testing.yml` with `WEB_AP
 
 To read container diagnostic categories while a test is running, dispatch the same workflow with `DIAGNOSTIC_ENV_NAME` set to its exact `fvtt-asp-on-<run-id>-<attempt>` or `fvtt-asp-off-<run-id>-<attempt>` name. This mode does not deploy or delete resources. It uses the WebApp environment identity and rejects other environment names.
 
-For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only Node preload that reports the application's `/data` mount entry. This changes test app settings, restarts that app, and refreshes its Key Vault references. It does not change the image. The workflow saves only mount evidence, not raw container logs. A test that passes only after this diagnostic change does not prove that the unchanged deployment starts correctly.
+For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only Node preload that reports the application's `/data` mount entry. This changes test app settings, restarts that app, refreshes its Key Vault references, and reapplies the same mount mapping after the storage key reference resolves. It does not change the image. The workflow saves only mount evidence, not raw container logs. A test that passes only after this diagnostic change does not prove that the unchanged deployment starts correctly.
 
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 

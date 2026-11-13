@@ -221,6 +221,27 @@ jobs:
                 Invoke-RestMethod -Method Put -Uri "$appUri/config/appsettings?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
                 Invoke-RestMethod -Method Post -Uri "$appUri/config/configreferences/appsettings/refresh?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
               }
+              $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
+              $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+              $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/STORAGE_ACCOUNT_KEY?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              if ($reference.properties.status -ne 'Resolved') {
+                throw 'The storage key reference is not resolved. Refusing to reapply the test mount.'
+              }
+              $mountBody = @{
+                properties = @{
+                  foundrydata = @{
+                    accessKey = '@AppSettingRef(STORAGE_ACCOUNT_KEY)'
+                    accountName = $storageAccountName
+                    protocol = 'Smb'
+                    mountPath = '/data'
+                    shareName = 'foundryvttdata'
+                    type = 'AzureFiles'
+                  }
+                }
+              } | ConvertTo-Json -Depth 5
+              Invoke-RestMethod -Method Put -Uri "$appUri/config/azurestorageaccounts?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $mountBody -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+              'Reapplied the unchanged test mount after its Key Vault reference resolved.' |
+                Add-Content -Path $Env:GITHUB_STEP_SUMMARY
               $mountInfoPath = Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-mountinfo.txt"
               for ($attempt = 1; $attempt -le 12; $attempt++) {
                 $probeLogs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
@@ -256,8 +277,6 @@ jobs:
                   $archive.Dispose()
                 }
               }
-              $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
-              $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
               $networking = if ($Env:AZURE_ENV_NAME -match '^fvtt-asp-on-') { 'Enabled' } else { 'Disabled' }
             }
             $logs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60 -MaximumRetryCount 3 -RetryIntervalSec 5
@@ -293,7 +312,7 @@ jobs:
                 Format-List
             }
           } finally {
-            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference -Force -ErrorAction SilentlyContinue
             if ($logZipPath -and (Test-Path -LiteralPath $logZipPath)) {
               Remove-Item -LiteralPath $logZipPath -Force
             }
