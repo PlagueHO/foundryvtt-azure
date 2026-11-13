@@ -9,6 +9,15 @@ on:
     paths:
       - infra/**
   workflow_dispatch:
+    inputs:
+      WEB_APP_ONLY:
+        description: "Run only the two sequential Web App tests. Paid resources require separate approval."
+        type: boolean
+        default: false
+
+concurrency:
+  group: foundry-infrastructure-tests
+  cancel-in-progress: false
   
 permissions:
   id-token: write
@@ -32,7 +41,8 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
-      AZURE_DEPLOY_NETWORKING: 'true'
+      AZURE_DEPLOY_NETWORKING: ${{ 'true' }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.WEB_APP_ONLY && 'false' || '' }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -43,6 +53,7 @@ jobs:
 
   test-webapp-without-networking:
     name: Test WebApp Deployment without Networking
+    if: ${{ always() && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp
@@ -52,7 +63,8 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
-      AZURE_DEPLOY_NETWORKING: 'false'
+      AZURE_DEPLOY_NETWORKING: ${{ 'false' }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.WEB_APP_ONLY && 'false' || '' }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -64,6 +76,7 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-app:
     name: Test Container App Deployment
+    if: ${{ !inputs.WEB_APP_ONLY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp-without-networking

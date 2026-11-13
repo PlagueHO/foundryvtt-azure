@@ -32,11 +32,20 @@ on:
         description: "Override networking with 'true' or 'false' for an isolated test. Otherwise use the environment variable."
         required: false
         type: string
+      AZURE_DEPLOY_DDB_PROXY:
+        description: "Override the optional proxy with 'true' or 'false'. Otherwise use the environment variable."
+        required: false
+        type: string
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
         type: boolean
         default: false
+
+    outputs:
+      CLEANUP_SUCCEEDED:
+        description: "Whether the isolated test resources were deleted successfully."
+        value: ${{ jobs.test-infrastructure.outputs.CLEANUP_SUCCEEDED }}
 
     secrets:
       AZURE_TENANT_ID:
@@ -61,6 +70,9 @@ on:
 jobs:
   test-infrastructure:
     name: Test ${{ inputs.ENVIRONMENT }} Infrastructure
+    timeout-minutes: 90
+    outputs:
+      CLEANUP_SUCCEEDED: ${{ steps.cleanup.outcome == 'success' }}
     env:
       # Required for azd to authenticate with Azure using Federated Credentials
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -83,7 +95,7 @@ jobs:
       # Environment variables for azd
       AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
       AZURE_COMPUTE_SERVICE: ${{ inputs.AZURE_COMPUTE_SERVICE || vars.AZURE_COMPUTE_SERVICE }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.AZURE_DEPLOY_DDB_PROXY || vars.AZURE_DEPLOY_DDB_PROXY }}
       AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
       AZURE_DEPLOY_NETWORKING: ${{ inputs.AZURE_DEPLOY_NETWORKING || vars.AZURE_DEPLOY_NETWORKING }}
       AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
@@ -111,6 +123,8 @@ jobs:
         shell: pwsh
 
       - name: Provision Infrastructure
+        id: provision
+        timeout-minutes: 20
         shell: pwsh
         run: |
           # Stream output to logs while also capturing it for targeted failure handling.
@@ -132,6 +146,7 @@ jobs:
           
       - name: Check Web App routing, references, and HTTP readiness
         if: env.AZURE_COMPUTE_SERVICE == 'Web App'
+        timeout-minutes: 40
         shell: pwsh
         run: |
           $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
@@ -155,6 +170,44 @@ jobs:
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           }
 
+      - name: Report Web App container diagnostic categories
+        if: ${{ always() && steps.provision.outcome == 'success' && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
+              throw 'Cannot obtain a token for test container diagnostics.'
+            }
+            $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupName)) {
+              throw 'Cannot read the isolated test resource group.'
+            }
+            $headers = @{ Authorization = "Bearer $token" }
+            $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            $logs = Invoke-RestMethod -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 60
+            $categories = [ordered]@{
+              'Azure Files mount failure' = 'BYOSFailure|failed to mount|mount error|permission denied'
+              'Container image pull failure' = 'ImagePullFailure|failed to pull|unauthorized: authentication required'
+              'Foundry authentication failure' = 'Authentication failed|Unable to authenticate'
+              'Foundry download failure' = 'Unable to proceed with installation|Download from presigned URL failed'
+              'Container startup failure' = 'ContainerStartFailure|did not respond to HTTP pings|container has exited'
+              'Foundry launcher started' = 'Starting launcher'
+            }
+            foreach ($category in $categories.GetEnumerator()) {
+              "$($category.Key): $([bool]($logs -match $category.Value))" |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            }
+            'Only fixed diagnostic categories were reported. Raw container logs were not printed.' |
+              Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+          } finally {
+            Remove-Variable -Name token, headers, logs -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Delete Infrastructure
+        id: cleanup
         if: always()
+        timeout-minutes: 15
         run: azd down --no-prompt --purge --force

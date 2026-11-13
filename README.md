@@ -172,7 +172,11 @@ With networking disabled, `allTraffic` is `false` and the app has no VNet integr
 
 Obtain approval for the test subscription, region, resource limits, cost limit, and Foundry licence use before deployment. Do not use production resources. The test workflow runs Web App cases with networking enabled and disabled in series, then deletes each test deployment.
 
+For an approved Web App-only run, dispatch `continuous-testing.yml` with `WEB_APP_ONLY=true`. The optional proxy and other compute modes are skipped. The second Web App case starts only after the first case's cleanup succeeds, including when its readiness check fails. Test steps have time limits and cleanup always runs.
+
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
+
+On failure, the checker reports unresolved references, failed HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
 
 Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
 

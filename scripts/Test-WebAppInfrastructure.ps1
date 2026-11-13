@@ -6,6 +6,7 @@
 .DESCRIPTION
     Uses the existing azd login for read-only Azure Resource Manager checks.
     Checks the Azure Files configuration and the Foundry HTTP response.
+    Reports readiness failure reasons without printing HTTP response bodies.
     An optional mountinfo file must come from the running application container,
     not the SCM container. Without this evidence, runtime mount verification
     remains blocked. The script does not deploy resources or change access.
@@ -139,24 +140,32 @@ try {
         }
 
         $ready = $false
+        $readinessStatus = 'Key Vault references are unresolved.'
         if ($unresolved.Count -eq 0) {
             try {
                 $response = Invoke-WebRequest -Uri "https://$($app.properties.defaultHostName)/" -SkipHttpErrorCheck -TimeoutSec 30
-                $ready = $response.StatusCode -eq 200 -and $response.Content -match '<title>[^<]*Foundry Virtual Tabletop[^<]*</title>'
+                if ($response.StatusCode -ne 200) {
+                    $readinessStatus = "HTTP status $([int]$response.StatusCode)."
+                } elseif ($response.Content -notmatch '<title>[^<]*Foundry Virtual Tabletop[^<]*</title>') {
+                    $readinessStatus = 'HTTP 200 response does not identify Foundry.'
+                } else {
+                    $ready = $true
+                }
             } catch [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
+                $readinessStatus = 'HTTP request failed.'
                 Write-Warning "The Web App HTTP request failed on attempt ${attempt}: $($_.Exception.Message). Retrying within the configured limit."
             }
         }
         if ($ready) {
             break
         }
-        Write-Information "Readiness attempt $attempt/$RetryCount. Unresolved references: $($unresolved -join ', ')." -InformationAction Continue
+        Write-Information "Readiness attempt $attempt/$RetryCount. $readinessStatus Unresolved references: $($unresolved -join ', ')." -InformationAction Continue
         if ($attempt -lt $RetryCount) {
             Start-Sleep -Seconds $RetryIntervalSeconds
         }
     }
     if (-not $ready) {
-        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts."
+        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts. Last readiness result: $readinessStatus Unresolved references: $($unresolved -join ', ')."
     }
     if (-not $runtimeMountVerified) {
         Write-Warning 'Runtime /data mount verification is BLOCKED: supply mountinfo from the application container. Routing, configuration, and HTTP readiness do not prove the mount.'

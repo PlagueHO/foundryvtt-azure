@@ -112,7 +112,8 @@ Describe 'Test Web App checks' {
 
     It 'stops after the retry limit when any Key Vault reference remains unresolved' {
         $referenceState.Status = 'AccessToKeyVaultDenied'
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: Key Vault references are unresolved.*FOUNDRY_USERNAME*STORAGE_ACCOUNT_KEY*'
         Should -Invoke Invoke-RestMethod -Times 8 -Exactly -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
         Should -Invoke Start-Sleep -Times 1 -Exactly
         Should -Invoke Invoke-WebRequest -Times 0 -Exactly
@@ -130,8 +131,28 @@ Describe 'Test Web App checks' {
     }
 
     It 'does not accept an HTTP 200 platform page as Foundry readiness' {
-        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>' } }
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>private-response-marker' } }
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: HTTP 200 response does not identify Foundry.*'
+        Should -Invoke Write-Information -Times 2 -Exactly -ParameterFilter {
+            $MessageData -like '*HTTP 200 response does not identify Foundry.*' -and
+                $MessageData -notlike '*private-response-marker*'
+        }
+    }
+
+    It 'reports HTTP <StatusCode> without printing the response body' -TestCases @(
+        @{ StatusCode = 403 }
+        @{ StatusCode = 503 }
+    ) {
+        param($StatusCode)
+        $httpFailure = @{ StatusCode = $StatusCode; Content = 'private-response-marker' }
+        Mock Invoke-WebRequest { $httpFailure }
+        { & $checkScript @checkParameters } |
+            Should -Throw "*within 2 attempts*Last readiness result: HTTP status $StatusCode.*"
+        Should -Invoke Write-Information -Times 2 -Exactly -ParameterFilter {
+            $MessageData -like "*HTTP status $StatusCode.*" -and
+                $MessageData -notlike '*private-response-marker*'
+        }
     }
 
     It 'retries an HTTP timeout before Foundry becomes ready' {
@@ -153,7 +174,8 @@ Describe 'Test Web App checks' {
         Mock Invoke-WebRequest {
             throw [System.Threading.Tasks.TaskCanceledException]::new('HTTP request timed out.')
         }
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: HTTP request failed.*'
         Should -Invoke Invoke-WebRequest -Times 2 -Exactly
         Should -Invoke Start-Sleep -Times 1 -Exactly
     }
