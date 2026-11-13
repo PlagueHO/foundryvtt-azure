@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Private access tests now restore the mapping before the restored probe starts and wait past mount-free startup results. A failed signed storage request no longer implies an identity or authentication cause.
 - Set Key Vault public access explicitly from the effective networking flag. Private deployments disable public access; deployments without networking use the intended authenticated public endpoint.
 - Improved Web App test failure messages to distinguish unresolved Key Vault reference statuses, HTTP request failures, HTTP status errors, and responses that do not identify Foundry. HTTP response bodies are not printed.
 - Corrected App Service log requests to use POST and added bounded retries for Azure management requests. Reference-status transport failures use the existing readiness retry limit instead of ending the test at the first reset connection. Invalid mount-capture selections fail before deployment.

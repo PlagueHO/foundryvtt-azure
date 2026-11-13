@@ -159,6 +159,7 @@ function Get-TestProbe {
                 }
             }
             Write-TestEvidence "${Phase} application-container access: privateDnsMatches=$($probe.privateDnsMatches); dnsError=$($probe.dnsError); tcp445=$($probe.smbTcpConnected); tcpError=$($probe.smbTcpError); keyResolved=$($probe.keyResolved); fileRestStatus=$($probe.fileRestStatus); fileRestError=$($probe.fileRestError)."
+            if ($Phase -eq 'Restored' -and [string]::IsNullOrWhiteSpace($probe.mountInfo)) { continue }
             return $probe
         }
         if ($attempt -lt 12) { Start-Sleep -Seconds 15 }
@@ -267,14 +268,14 @@ try {
     if ($probe -and (-not $probe.privateDnsMatches -or -not $probe.smbTcpConnected)) {
         Write-TestEvidence 'Access classification: application-container storage DNS or TCP 445 failed. This is network evidence, not a missing Key Vault role.'
     } elseif ($probe -and $probe.fileRestStatus -ne 200) {
-        Write-TestEvidence 'Access classification: TCP 445 and private DNS work, but the signed storage request failed. Investigate the reported storage authentication/policy code.'
+        Write-TestEvidence 'Access classification: TCP 445 and private DNS work, but signed storage access did not return HTTP 200. Use the reported HTTP status and safe error code; do not assume an identity or authentication cause.'
     } elseif ($probe) {
         Write-TestEvidence 'Access classification: application-container private DNS, TCP 445, and signed storage-key access work. The remaining fault is in the platform mount/startup path, not the app Key Vault role. FileREST success does not prove SMB authentication.'
     }
     if ($mountRemoved) {
-        Set-TestProbe 'Restored'
         Invoke-TestManagementRequest "$appId/config/azurestorageaccounts" -Method Put -Body @{ properties = $originalMount.properties } | Out-Null
         $mountRemoved = $false
+        Set-TestProbe 'Restored'
         Write-TestEvidence 'Restored the original test mapping and started a separately labelled probe.'
         $probe = Get-TestProbe 'Restored'
     }
