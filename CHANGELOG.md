@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added read-only inspection of retained policy operations for an exact test vault after cleanup, without provisioning resources or changing access.
+- Added a separately approved private-only startup comparison that records mount state and checks readiness after unchanged mapping replay, before adding a container mount probe.
 - Added Web App-only test selection, bounded test steps, cleanup-gated sequential tests, and container diagnostic categories without raw log output. Existing isolated tests also support read-only access checks and opt-in application-container mount evidence capture.
 - Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.

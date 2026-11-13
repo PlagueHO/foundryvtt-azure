@@ -44,6 +44,10 @@ on:
         description: "Add a Node mount probe and refresh references in an existing isolated test app only."
         type: boolean
         default: false
+      CHECK_MOUNT_STARTUP_ORDER:
+        description: "For one approved private test, compare baseline startup with unchanged mount replay before adding the mount probe."
+        type: boolean
+        default: false
       ALLOW_STORAGE_POLICY_403_FORBIDDEN:
         description: "When true, treats azd provision failures containing '(403) Forbidden' as non-fatal."
         required: false
@@ -116,6 +120,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate controlled private test scope
+        if: inputs.CHECK_MOUNT_STARTUP_ORDER
+        shell: pwsh
+        run: |
+          if ($Env:AZURE_ENV_NAME -notmatch '^fvtt-asp-on-\d+-\d+$' -or
+              $Env:AZURE_RESOURCE_GROUP_NAME -ne "rg-$Env:AZURE_ENV_NAME" -or
+              $Env:AZURE_COMPUTE_SERVICE -ne 'Web App' -or $Env:AZURE_DEPLOY_NETWORKING -ne 'true' -or
+              $Env:AZURE_DEPLOY_DDB_PROXY -ne 'false' -or $Env:AZURE_LOCATION -ne 'NewZealandNorth' -or
+              $Env:AZURE_APP_SERVICE_PLAN_SKUNAME -ne 'P0v3') {
+            throw 'The controlled test does not match the approved private scope. No Azure login or deployment was started.'
+          }
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -154,13 +169,15 @@ jobs:
           }
           
       - name: Check Web App routing, references, and HTTP readiness
+        id: readiness
         if: ${{ !inputs.DIAGNOSTICS_ONLY && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
-        timeout-minutes: 40
+        timeout-minutes: ${{ inputs.CHECK_MOUNT_STARTUP_ORDER && 15 || 40 }}
         shell: pwsh
         run: |
           $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
           $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
           $networking = if ($Env:AZURE_DEPLOY_NETWORKING -eq 'true') { 'Enabled' } else { 'Disabled' }
+          $retryCount = if ('${{ inputs.CHECK_MOUNT_STARTUP_ORDER }}' -eq 'true') { 20 } else { 60 }
           $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupName)) {
             throw 'Cannot read the provisioned test resource group name from azd.'
@@ -171,7 +188,8 @@ jobs:
             -ResourceGroupName $resourceGroupName `
             -WebAppName $Env:AZURE_ENV_NAME `
             -StorageAccountName $storageAccountName `
-            -Networking $networking
+            -Networking $networking `
+            -RetryCount $retryCount
           "Web App routing, Key Vault references, storage configuration, and Foundry HTTP readiness: passed." |
             Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           if (-not $result.RuntimeMountVerified) {
@@ -179,13 +197,84 @@ jobs:
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           }
 
-      - name: Report Web App container diagnostic categories
-        if: ${{ always() && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
-        timeout-minutes: 10
+      - name: Compare startup after unchanged private test mount replay
+        id: mount_replay
+        if: ${{ always() && inputs.CHECK_MOUNT_STARTUP_ORDER && steps.provision.outcome == 'success' && steps.readiness.outcome != 'success' }}
+        timeout-minutes: 15
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           try {
+            if ($Env:AZURE_ENV_NAME -notmatch '^fvtt-asp-on-\d+-\d+$' -or
+                $Env:AZURE_DEPLOY_NETWORKING -ne 'true' -or $Env:AZURE_COMPUTE_SERVICE -ne 'Web App') {
+              throw 'Startup comparison is limited to the approved isolated private Web App test.'
+            }
+            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
+              throw 'Cannot obtain a token for the controlled startup comparison.'
+            }
+            $headers = @{ Authorization = "Bearer $token" }
+            $resourceGroupName = & azd env get-value AZURE_RESOURCE_GROUP_NAME
+            if ($LASTEXITCODE -ne 0 -or $resourceGroupName -ne "rg-$Env:AZURE_ENV_NAME") {
+              throw 'The startup comparison resource group does not match the isolated test.'
+            }
+            $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            foreach ($referenceName in @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')) {
+              $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              if ($reference.properties.status -ne 'Resolved') {
+                throw "Reference $referenceName is $($reference.properties.status). Refusing mount replay."
+              }
+            }
+            $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
+            $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
+            $mount = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            $mapping = $mount.properties.foundrydata
+            if (@($mount.properties.PSObject.Properties).Count -ne 1 -or
+                $mapping.accountName -ne $storageAccountName -or $mapping.shareName -ne 'foundryvttdata' -or
+                $mapping.mountPath -ne '/data' -or $mapping.protocol -ne 'Smb' -or $mapping.type -ne 'AzureFiles' -or
+                $mapping.accessKey -ne '@AppSettingRef(STORAGE_ACCOUNT_KEY)') {
+              throw 'The current mount does not match the unchanged test mapping. Refusing replay.'
+            }
+            "Baseline mount state: $($mapping.state). All four references are Resolved." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            if ([string]::IsNullOrWhiteSpace($mapping.state)) {
+              Write-Warning 'The API did not supply a baseline mount state.'
+            }
+            try {
+              $logs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              $failureTokens = [regex]::Matches([string]$logs, '(?i)mount error\(\d+\)|STATUS_[A-Z_]+|BYOSFailure|cifs_mount failed w/return code = -?\d+|AppSettingRef|KeyVaultReference|Authentication failed|invalid argument|permission denied') |
+                ForEach-Object Value | Sort-Object -Unique
+              "Baseline failure tokens: $($failureTokens -join ', ')." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+              if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+              Write-Warning 'Baseline container logs are unavailable (HTTP 404). Mount state and reference checks were retained.'
+            }
+            $mapping.PSObject.Properties.Remove('state')
+            $body = @{ properties = $mount.properties } | ConvertTo-Json -Depth 10
+            Invoke-RestMethod -Method Put -Uri "$appUri/config/azurestorageaccounts?api-version=2025-03-01" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null
+            'Replayed the unchanged private mount without changing app settings, image, references, roles, or policy.' |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            & ./scripts/Test-WebAppInfrastructure.ps1 -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID `
+              -TenantId $Env:AZURE_TENANT_ID -ResourceGroupName $resourceGroupName `
+              -WebAppName $Env:AZURE_ENV_NAME -StorageAccountName $storageAccountName `
+              -Networking Enabled -RetryCount 20 -RetryIntervalSeconds 30 | Format-List
+            'HTTP readiness after unchanged mount replay: passed, before adding the Node probe.' |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+          } finally {
+            Remove-Variable -Name token, headers, mount, mapping, logs, body, reference -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Report Web App container diagnostic categories
+        if: ${{ always() && (steps.provision.outcome == 'success' || inputs.DIAGNOSTICS_ONLY) && env.AZURE_COMPUTE_SERVICE == 'Web App' }}
+        timeout-minutes: 10
+        shell: pwsh
+        env:
+          CAPTURE_MOUNT_REQUESTED: ${{ inputs.CAPTURE_MOUNT_EVIDENCE || (inputs.CHECK_MOUNT_STARTUP_ORDER && (steps.readiness.outcome == 'success' || steps.mount_replay.outcome == 'success')) }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            $captureMount = $Env:CAPTURE_MOUNT_REQUESTED -eq 'true'
             $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
               throw 'Cannot obtain a token for test container diagnostics.'
@@ -204,6 +293,11 @@ jobs:
             }
             $headers = @{ Authorization = "Bearer $token" }
             $appUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/$resourceGroupName/providers/Microsoft.Web/sites/$Env:AZURE_ENV_NAME"
+            if ('${{ inputs.CHECK_MOUNT_STARTUP_ORDER }}' -eq 'true') {
+              $mount = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              "Mount state after startup comparison: $($mount.properties.foundrydata.state)." |
+                Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            }
             foreach ($referenceName in @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')) {
               $referenceStatus = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
               "Key Vault reference $referenceName status: $($referenceStatus.properties.status)." |
@@ -256,8 +350,9 @@ jobs:
                   Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
               }
             }
-            if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
-              if ('${{ inputs.DIAGNOSTICS_ONLY }}' -ne 'true') {
+            if ($captureMount) {
+              if ('${{ inputs.DIAGNOSTICS_ONLY }}' -ne 'true' -and
+                  ('${{ inputs.CHECK_MOUNT_STARTUP_ORDER }}' -ne 'true' -or $Env:AZURE_ENV_NAME -notmatch '^fvtt-asp-on-\d+-\d+$')) {
                 throw 'Mount evidence capture requires the existing isolated test diagnostics mode.'
               }
               $settings = Invoke-RestMethod -Method Post -Uri "$appUri/config/appsettings/list?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
@@ -301,7 +396,14 @@ jobs:
                 Add-Content -Path $Env:GITHUB_STEP_SUMMARY
               $mountInfoPath = Join-Path $Env:RUNNER_TEMP "$Env:AZURE_ENV_NAME-mountinfo.txt"
               for ($attempt = 1; $attempt -le 12; $attempt++) {
-                $probeLogs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+                try {
+                  $probeLogs = Invoke-RestMethod -Method Post -Uri "$appUri/containerlogs?api-version=2025-03-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+                } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+                  if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+                  Write-Warning "Container logs are not yet available after restart (HTTP 404, attempt $attempt)."
+                  Start-Sleep -Seconds 15
+                  continue
+                }
                 $evidence = [regex]::Matches([string]$probeLogs, 'FVTT_MOUNTINFO:([A-Za-z0-9+/=]+)')
                 if ($evidence.Count -gt 0) {
                   [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($evidence[-1].Groups[1].Value)) |
@@ -358,7 +460,7 @@ jobs:
               ForEach-Object Value | Sort-Object -Unique
             "Recognized failure tokens: $($failureTokens -join ', ')" |
               Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-            if ('${{ inputs.CAPTURE_MOUNT_EVIDENCE }}' -eq 'true') {
+            if ($captureMount) {
               if (-not (Test-Path -LiteralPath $mountInfoPath)) {
                 throw 'No application-container mount evidence was found in the log tail or archive.'
               }
@@ -369,14 +471,14 @@ jobs:
                 Format-List
             }
           } finally {
-            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment, activity, write -Force -ErrorAction SilentlyContinue
+            Remove-Variable -Name token, headers, logs, settings, body, probeLogs, entryLogs, reference, vaultDeployment, activity, write, mount -Force -ErrorAction SilentlyContinue
             if ($logZipPath -and (Test-Path -LiteralPath $logZipPath)) {
               Remove-Item -LiteralPath $logZipPath -Force
             }
           }
 
       - name: Preserve application-container mount evidence
-        if: ${{ always() && inputs.DIAGNOSTICS_ONLY && inputs.CAPTURE_MOUNT_EVIDENCE }}
+        if: ${{ always() && ((inputs.DIAGNOSTICS_ONLY && inputs.CAPTURE_MOUNT_EVIDENCE) || inputs.CHECK_MOUNT_STARTUP_ORDER) }}
         uses: actions/upload-artifact@v7
         with:
           name: webapp-runtime-mount-${{ env.AZURE_ENV_NAME }}
