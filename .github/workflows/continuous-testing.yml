@@ -237,7 +237,7 @@ jobs:
               throw 'More than 100 matching policy states exist. The policy inspection is incomplete.'
             }
             if (@($states.value).Count -eq 0) {
-              throw 'No retained modify policy states were found for the exact test vault. This does not exclude policy enforcement.'
+              Write-Warning 'No retained modify policy states were found for the exact test vault. This does not exclude policy enforcement. Storage inspection will continue.'
             }
             "Retained modify policy states for the exact test vault: $(@($states.value).Count)." |
               Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
