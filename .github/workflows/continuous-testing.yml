@@ -22,6 +22,10 @@ on:
         description: "For an existing test only: add a Node mount probe and refresh Key Vault references. Restarts the test app."
         type: boolean
         default: false
+      POLICY_DIAGNOSTICS_ONLY:
+        description: "Read retained policy operations for an exact test vault, including after cleanup. Does not deploy or change access."
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ inputs.DIAGNOSTIC_ENV_NAME && format('foundry-diagnostics-{0}', inputs.DIAGNOSTIC_ENV_NAME) || 'foundry-infrastructure-tests' }}
@@ -44,12 +48,17 @@ jobs:
         env:
           DIAGNOSTIC_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
           CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
+          POLICY_DIAGNOSTICS_ONLY: ${{ inputs.POLICY_DIAGNOSTICS_ONLY }}
         run: |
           if ($Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -and [string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME)) {
             throw 'Mount evidence capture requires an existing isolated test environment name. No deployment was started.'
           }
           if (-not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME) -and $Env:DIAGNOSTIC_ENV_NAME -notmatch '^fvtt-asp-(on|off)-\d+-\d+$') {
             throw 'Diagnostics are limited to existing isolated Web App test names.'
+          }
+          if ($Env:POLICY_DIAGNOSTICS_ONLY -eq 'true' -and
+              ([string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME) -or $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true')) {
+            throw 'Policy-only diagnostics require an exact test name and cannot capture mount evidence. No deployment was started.'
           }
 
   lint-and-publish-bicep:
@@ -145,7 +154,7 @@ jobs:
   diagnose-webapp:
     name: Read Existing Web App Test Diagnostics
     needs: validate-inputs
-    if: inputs.DIAGNOSTIC_ENV_NAME != ''
+    if: inputs.DIAGNOSTIC_ENV_NAME != '' && !inputs.POLICY_DIAGNOSTICS_ONLY
     uses: ./.github/workflows/test-infrastructure.yml
     with:
       ENVIRONMENT: WebApp
@@ -161,3 +170,75 @@ jobs:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+  diagnose-vault-policy:
+    name: Read Retained Test Vault Policy Operations
+    needs: validate-inputs
+    if: inputs.POLICY_DIAGNOSTICS_ONLY
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: WebApp
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      DIAGNOSTIC_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
+    steps:
+      - name: Install azd
+        uses: Azure/setup-azd@v2.4.0
+      - name: Authenticate azd (Federated Credentials)
+        shell: pwsh
+        run: |
+          azd auth login `
+            --client-id "$Env:AZURE_CLIENT_ID" `
+            --federated-credential-provider "github" `
+            --tenant-id "$Env:AZURE_TENANT_ID"
+      - name: Read exact test vault policy operations
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
+              throw 'Cannot obtain a token for read-only test policy diagnostics.'
+            }
+            $headers = @{ Authorization = "Bearer $token" }
+            $vaultName = 'kv' + $Env:DIAGNOSTIC_ENV_NAME.Replace('-', '')
+            $vaultName = $vaultName.Substring(0, [Math]::Min(24, $vaultName.Length))
+            $resourceId = "/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$Env:DIAGNOSTIC_ENV_NAME/providers/Microsoft.KeyVault/vaults/$vaultName"
+            $filter = [uri]::EscapeDataString("ResourceId eq '$resourceId' and PolicyDefinitionAction eq 'modify'")
+            $from = [uri]::EscapeDataString([DateTime]::UtcNow.AddDays(-1).ToString('o'))
+            $uri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.PolicyInsights/policyStates/all/queryResults?api-version=2019-10-01&`$filter=$filter&`$from=$from&`$top=100"
+            $states = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            if (-not [string]::IsNullOrWhiteSpace($states.'@odata.nextLink')) {
+              throw 'More than 100 matching policy states exist. The policy inspection is incomplete.'
+            }
+            if (@($states.value).Count -eq 0) {
+              throw 'No retained modify policy states were found for the exact test vault. This does not exclude policy enforcement.'
+            }
+            "Retained modify policy states for the exact test vault: $(@($states.value).Count)." |
+              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+            $definitions = @($states.value | Select-Object -ExpandProperty policyDefinitionId -Unique)
+            foreach ($definitionId in $definitions) {
+              $definition = Invoke-RestMethod -Uri "https://management.azure.com$definitionId`?api-version=2023-04-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+              $operations = @($definition.properties.policyRule.then.details.operations | Where-Object {
+                $_.field -eq 'Microsoft.KeyVault/vaults/publicNetworkAccess'
+              })
+              if ($operations.Count -eq 0) {
+                'Modify policy has no direct publicNetworkAccess operation.' |
+                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              }
+              foreach ($operation in $operations) {
+                if ($operation.value -notin @('Enabled', 'Disabled')) {
+                  throw 'The publicNetworkAccess operation is not a literal Enabled or Disabled value. Assignment parameter evaluation is still required.'
+                }
+                "Vault policy operation: operation=$($operation.operation); field=$($operation.field); value=$($operation.value)." |
+                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
+              }
+            }
+          } finally {
+            Remove-Variable -Name token, headers, states, definition -Force -ErrorAction SilentlyContinue
+          }
