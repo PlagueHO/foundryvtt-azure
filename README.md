@@ -290,100 +290,225 @@ azd down --purge
 
 ## Deploy with GitHub Actions
 
-You can also deploy this solution using GitHub Actions for automated CI/CD. This approach is useful for production deployments.
+Use the supplied workflows to deploy from your own GitHub repository. The production workflow runs only when you start it manually. It does not deploy on a push or a schedule.
 
-### 1. Add an Environment in GitHub
+The workflow uses OpenID Connect (OIDC) to obtain a short-lived Azure token. You do not need an Azure client secret.
 
-[Create a new environment in your GitHub repository](https://docs.github.com/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment#creating-an-environment) called `Production` (or any name you prefer). This environment will be used to manage secrets and variables for the deployment.
+### 1. Prepare your repository and access
 
-### 2. Configure GitHub Secrets and Variables
+1. Fork this repository, or use a repository you control that contains the supplied deployment files.
+1. If GitHub disables Actions in your fork, open **Actions** and enable workflows.
+1. Confirm that these files are present on your default branch:
+   - [.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml)
+   - [.github/workflows/deploy-infrastructure.yml](.github/workflows/deploy-infrastructure.yml)
+   - [azure.yaml](azure.yaml) and the [infra](infra) directory.
+1. Use `main` for the deployment. The supplied production workflow skips its deployment job on any other branch.
+1. Confirm that you can manage repository environments, secrets, and variables. You also need write access to run the workflow.
+1. Prepare an Azure subscription and a Foundry VTT account with a valid licence. The person who configures Azure must be allowed to create a Microsoft Entra application and service principal, add a federated credential, and assign Azure roles.
 
-1. Set the following **secrets** in the new GitHub repository or `Production` environment:
+You do not need to install `azd` locally for this deployment method. The workflow installs it on the runner. The Azure setup example below requires Azure PowerShell.
 
-    - `AZURE_CLIENT_ID`: The Application (Client) ID of the Service Principal or Workload Identity used to authenticate to Azure.
-    - `AZURE_TENANT_ID`: The Tenant ID of the Service Principal or Workload Identity.
-    - `AZURE_SUBSCRIPTION_ID`: The Subscription ID of the Azure Subscription to deploy to.
-    - `FOUNDRY_USERNAME`: Your Foundry VTT username.
-    - `FOUNDRY_PASSWORD`: Your Foundry VTT password.
-    - `FOUNDRY_ADMIN_KEY`: The admin key for Foundry VTT.
+> [!WARNING]
+> A successful workflow creates billable Azure resources. Check the region, compute service, storage configuration, and optional services before you run it.
 
-    > [!NOTE]
-    > If you're using the same Service Principal, Workload Identity and Foundry information for multiple environments, you can set these secrets at the repository level instead of the environment level.
+### 2. Create the Production environment
 
-    ![GitHub repository secrets](docs/images/github-actions-repository-secrets.png)
+1. Open your repository's **Settings**.
+1. Select **Environments**.
+1. Select **New environment**.
+1. Enter `Production`, then select **Configure environment**.
+1. If available for your repository and GitHub plan, configure required reviewers and restrict deployment branches to `main`.
 
-2. Set the following repository **variables** in the `Production` environment:
+![GitHub new environment form with Production entered and the Configure environment button](docs/images/github-actions-create-environment.png)
 
-    - `AZURE_ENV_NAME` - A unique name for your Foundry VTT environment (e.g., `myuniquefvtt01`).
-    - `AZURE_LOCATION` - The name of the Azure region to deploy to (e.g., `EastUS2`).
-    - `AZURE_COMPUTE_SERVICE` - Set to `Web App` or `Container Instance` to choose the compute service for Foundry VTT.
-    - `AZD_PROVISION_NO_STATE` - Set to `true` to force reprovisioning of resources on each deployment. This is useful for production deployments to ensure the latest configuration is applied or if changes have been made to production outside of the GitHub Actions workflow.
+The GitHub Environment name `Production` is separate from `AZURE_ENV_NAME`, which names the Azure deployment. Keep both names consistent across later runs to update the same deployment.
 
-    ![GitHub Production environment variables](docs/images/github-actions-environment-variables.png)
+> [!IMPORTANT]
+> The supplied workflow passes `ENVIRONMENT: Production` to the reusable workflow. To use another GitHub Environment name, change that input and the environment name in the Azure federated credential subject. Creating a differently named environment alone does not change the deployment target.
 
-### 3. Configure Workload Identity Federation
+See [GitHub: Manage environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) for access requirements and protection rule availability.
 
-To securely authenticate your GitHub Actions workflow to Azure, configure [Workload Identity Federation](https://learn.microsoft.com/azure/active-directory/develop/workload-identity-federation):
+### 3. Configure Azure workload identity federation
 
-Create an Azure AD Application and Federated Credential for your GitHub repository:
+Create a Microsoft Entra application and its service principal. Add a federated credential that trusts the `Production` environment in **your** deployment repository.
+
+For Azure portal setup, follow [Microsoft Learn: Authenticate to Azure from GitHub Actions with OpenID Connect](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect). Use these values when you add the federated credential:
+
+| Field | Value |
+| --- | --- |
+| Federated credential scenario | GitHub Actions deploying Azure resources |
+| Organization and repository | The owner and name of your deployment repository, including your fork if used |
+| Organization ID and repository ID | The numeric owner and repository IDs from GitHub, when using an immutable subject |
+| Entity type | Environment |
+| Environment | `Production` |
+| Issuer | `https://token.actions.githubusercontent.com` |
+| Audience | `api://AzureADTokenExchange` |
+| Subject with immutable IDs | `repo:<owner>@<owner-id>/<repository>@<repository-id>:environment:Production` |
+| Subject for a repository that still uses the name-based format | `repo:<owner>/<repository>:environment:Production` |
+
+Use the exact owner, repository, and environment spelling in the subject. Do not use a branch-based subject for this workflow because its deployment job uses a GitHub Environment.
+
+Check your repository's OIDC settings before you create the credential. The Azure subject must match the subject that GitHub issues. GitHub.com repositories created, renamed, or transferred after July 15, 2026 use immutable subjects. Older repositories keep the name-based format unless they opt in. A new fork can therefore need a different subject format from its source repository. If your repository uses a custom subject, use that exact value instead. See [GitHub: OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+
+The Azure portal now generates an immutable subject from the organization and repository IDs. For a repository that still uses a name-based subject, select **Edit (optional)** beside **Subject identifier** and enter the matching name-based value. The screenshot below shows this unsaved example for `PlagueHO/foundryvtt-azure`. The ID fields are disabled because the subject was entered directly. Do not copy this repository's subject into a credential for your fork.
+
+![Azure federated credential form with a manually entered name-based Production subject, GitHub issuer, and Azure token exchange audience](docs/images/github-actions-federated-credential.png)
+
+Prefer immutable subjects for new setup. To migrate an existing deployment, follow [Microsoft Learn: Migrate GitHub Actions federated credentials to immutable subjects](https://learn.microsoft.com/en-us/entra/workload-id/workload-identities-github-immutable-subjects). Coordinate the GitHub OIDC setting and Azure credential changes so they continue to match.
+
+Alternatively, run this example with the `Az.Accounts` and `Az.Resources` PowerShell modules installed. Replace each placeholder before you run it. This example creates a new application and grants subscription-level deployment permissions.
 
 ```powershell
-$credentialname = '<The name to use for the credential & app>' # e.g., github-foundryvtt-workflow-production-environment
-$application = New-AzADApplication -DisplayName $credentialname
-$policy = "repo:<your GitHub user>/<your GitHub repo>:environment:<Production or your environment name>"
-$subscriptionId = '<your Azure subscription>'
+$ErrorActionPreference = 'Stop'
+Import-Module Az.Accounts
+Import-Module Az.Resources
+
+$tenantId = '<azure-tenant-id>'
+$subscriptionId = '<azure-subscription-id>'
+$subject = '<exact-Production-subject-from-your-repository-OIDC-settings>'
+$credentialName = 'github-foundryvtt-production'
+
+Connect-AzAccount -Tenant $tenantId
+Set-AzContext -SubscriptionId $subscriptionId -Tenant $tenantId
+
+$application = New-AzADApplication -DisplayName $credentialName
+$servicePrincipal = New-AzADServicePrincipal -ApplicationId $application.AppId
 
 New-AzADAppFederatedCredential `
-  -Name $credentialname `
+  -Name $credentialName `
   -ApplicationObjectId $application.Id `
   -Issuer 'https://token.actions.githubusercontent.com' `
   -Audience 'api://AzureADTokenExchange' `
-  -Subject $policy
-New-AzADServicePrincipal -AppId $application.AppId
-
+  -Subject $subject
 
 New-AzRoleAssignment `
-  -ApplicationId $application.AppId `
-  -RoleDefinitionName Contributor `
+  -ObjectId $servicePrincipal.Id `
+  -RoleDefinitionName 'Contributor' `
   -Scope "/subscriptions/$subscriptionId" `
-  -Description "The GitHub Actions deployment workflow for Foundry VTT."
+  -Description 'Deploy Foundry VTT resources from GitHub Actions.'
+
+New-AzRoleAssignment `
+  -ObjectId $servicePrincipal.Id `
+  -RoleDefinitionName 'Role Based Access Control Administrator' `
+  -Scope "/subscriptions/$subscriptionId" `
+  -Description 'Create the Key Vault role assignments for Foundry VTT.'
+
+$application.AppId
 ```
 
 > [!IMPORTANT]
-> The GitHub Actions identity also needs permission to create Azure RBAC assignments because this deployment assigns `Key Vault Secrets Officer` and `Key Vault Secrets User` roles on the Azure Key Vault. Grant either `Role Based Access Control Administrator`, `User Access Administrator`, or `Owner` at the required scope.
+> `Contributor` alone cannot create Azure role assignments. The example also grants `Role Based Access Control Administrator`. An administrator can instead grant `User Access Administrator`, or use an existing `Owner` assignment, at the required scope.
 >
-> For least privilege, if you choose `User Access Administrator`, configure a condition that allows only these role assignments:
+> For least privilege, constrain `User Access Administrator` to assigning only `Key Vault Secrets Officer` and `Key Vault Secrets User` to service principals. These principal types include the managed identities used by this solution. See [Delegate role assignment management with conditions](https://learn.microsoft.com/en-us/azure/role-based-access-control/delegate-role-assignments-portal).
 >
-> - `Key Vault Secrets Officer`
-> - `Key Vault Secrets User`
->
-> And limit the allowed principal type to:
->
-> - Service principals
->
-> This matches the deployment behavior for GitHub Actions, Azure Web App, and Azure Container Apps managed identities.
+> If you enable storage resource locks, the deployment identity must also have permission to create the required locks.
 
-For more details, see [Microsoft Learn: Authenticate Azure deployment workflow using workload identities](https://learn.microsoft.com/training/modules/authenticate-azure-deployment-workflow-workload-identities).
+Record the application **client ID** from `$application.AppId`. Do not use `$application.Id` or `$servicePrincipal.Id` as `AZURE_CLIENT_ID`. Those values are object IDs. Azure role assignments use the service principal object ID.
 
-### 4. Example GitHub Actions Workflow
+### 4. Add the GitHub secrets
 
-Sample workflow files:
+Open **Settings > Environments > Production**. Under **Environment secrets**, select **Add environment secret** for each value:
 
-- [.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml)
-- [.github/workflows/deploy-infrastructure.yml](.github/workflows/deploy-infrastructure.yml)
+| Secret | Value |
+| --- | --- |
+| `AZURE_CLIENT_ID` | The application client ID from the previous step |
+| `AZURE_TENANT_ID` | The Microsoft Entra tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | The Azure subscription ID |
+| `FOUNDRY_USERNAME` | Your Foundry VTT account username |
+| `FOUNDRY_PASSWORD` | Your Foundry VTT account password |
+| `FOUNDRY_ADMIN_KEY` | The admin key you want to use for this Foundry VTT server |
 
-The deploy-production.yml workflow just calls the deploy-infrastructure.yml workflow to deploy the Foundry VTT solution.
+You can instead use repository secrets when you need to share the same values across environments. Open **Settings > Secrets and variables > Actions > Secrets > New repository secret**. An environment secret with the same name takes precedence in the deployment job. The supplied caller passes all six named secrets to the reusable workflow. See [GitHub: Reuse workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow).
 
-The deploy-infrastructure.yml workflow performs the following steps:
+Do not add an Azure client secret. Do not put passwords or the Foundry admin key in configuration variables or workflow files.
 
-1. Load the configuration options from the GitHub Actions environment variables.
-1. Authenticate to Azure using workload identity.
-1. Run `azd up` to provision and deploy the solution.
+![GitHub Actions repository secrets list with the six required secret names](docs/images/github-actions-repository-secrets.png)
 
-### 5. Complete
+### 5. Add the deployment variables
 
-Once you have configured the GitHub Actions workflow, you can trigger it manually through the GitHub Actions UI
-![GitHub Actions run Workflow](docs/images/github-actions-run-workflow.png)
+On **Settings > Environments > Production**, use **Environment variables > Add environment variable**. Variables hold non-secret configuration.
+
+Set these deployment values explicitly:
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `AZURE_ENV_NAME` | `myuniquefvtt01` | A unique Azure deployment name used in resource names |
+| `AZURE_LOCATION` | `eastus2` | An Azure region that supports your selected services and SKUs |
+| `AZURE_RESOURCE_GROUP_NAME` | `rg-myuniquefvtt01` | The resource group to create or update |
+| `AZURE_COMPUTE_SERVICE` | `Web App` | `Web App`, `Container Instance`, or `Container App` |
+
+Set `AZURE_APP_SERVICE_PLAN_SKUNAME` and `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB` for every compute service. The template validates both parameters even when their resources are not deployed. Use `P0v3` and `2` for unused compute options.
+
+Configure the remaining values as needed. The example values below provide a Web App starting configuration. They are not a list of guaranteed defaults when variables are absent.
+
+| Variable | Example | Applies to |
+| --- | --- | --- |
+| `AZURE_APP_SERVICE_PLAN_SKUNAME` | `P0v3` | Set for all deployments; controls Web App sizing |
+| `AZURE_DEPLOY_NETWORKING` | `true` | Web App and Container App; use `false` for Container Instance |
+| `AZURE_DEPLOY_DDB_PROXY` | `false` | Web App and Container App |
+| `AZURE_DEPLOY_DIAGNOSTICS` | `false` | Optional diagnostics |
+| `AZURE_STORAGE_RESOURCE_LOCK_ENABLED` | `false` | Optional storage deletion protection |
+| `AZURE_STORAGE_PUBLIC_ACCESS` | `false` | Keep public storage access disabled for network-isolated deployments |
+| `AZURE_CONTAINER_INSTANCE_CPU` | `2` | Container Instance; from `1` to `4` |
+| `AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB` | `2` | Set for all deployments; controls Container Instance memory, from `1` to `16` in increments of `0.5` |
+| `AZURE_CONTAINER_APP_MIN_REPLICAS` | `0` | Container App; `0` enables scale-to-zero, `1` keeps a replica running |
+| `FOUNDRY_DOCKER_IMAGE_TAG` | `release` | Foundry VTT container image tag |
+| `AZD_PROVISION_NO_STATE` | `false` | Set to `true` only when you need the workflow to add `--no-state` to `azd provision` |
+
+> [!IMPORTANT]
+> GitHub resolves an unset variable to an empty string. The workflow exports these strings to the runner. An empty value does not necessarily use the fallback in `main.bicepparam`. In particular, set the deployment values, the image tag, both required sizing values above, and all boolean options explicitly. Use lowercase `true` or `false` for booleans.
+
+`AZD_PROVISION_NO_STATE=true` forces a fresh Bicep deployment from the current template files and ignores stored deployment state. It is not required for normal updates and does not mean that Azure deletes and recreates every resource. Keep it `false` unless you need that option. See the [azd command reference](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/reference#azd-provision).
+
+The workflow sets `AZURE_PRINCIPAL_ID_TYPE` to `ServicePrincipal` itself. You do not need to add this variable or set `AZURE_PRINCIPAL_ID` manually.
+
+The [Configuration Options](#configuration-options) section describes CLI settings, but not every setting is passed by the GitHub workflow. For example, `AZURE_STORAGE_CONFIGURATION` and `AZURE_BASTION_HOST_DEPLOY` are not currently passed. Adding them as GitHub variables alone has no effect; supporting them requires an explicit workflow change.
+
+![GitHub Production environment variables showing deployment names, region, compute, and optional settings](docs/images/github-actions-environment-variables.png)
+
+### 6. Run the production workflow
+
+The `deploy-production.yml` caller selects `Production` and passes the six secrets to `deploy-infrastructure.yml`. The reusable workflow loads the configuration, installs `azd`, signs in through federation, and runs `azd provision --no-prompt`, not `azd up`.
+
+The supplied workflow already grants `id-token: write` for OIDC and `contents: read` for checkout. Keep these permissions when you adapt the workflow.
+
+1. Open the **Actions** tab in your deployment repository.
+1. Select **deploy-production** from the workflow list.
+1. Select **Run workflow**.
+1. Select branch **main**.
+1. Select the green **Run workflow** button.
+1. Open the new run. If it waits for an environment review, have an authorized reviewer approve the deployment.
+
+See [GitHub: Run a workflow manually](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) for the UI steps and access requirements.
+
+![GitHub Actions Run workflow menu with the main branch selected](docs/images/github-actions-run-workflow.png)
+
+### 7. Check the deployment result
+
+1. Open the deployment job in the workflow run.
+1. Check that **Authenticate azd (Federated Credentials)** succeeded.
+1. Open **Provision Infrastructure** and check its result.
+1. Find the post-provision message `The URL for accessing your Foundry VTT deployment is:` in the logs. The [azure.yaml](azure.yaml) hook prints the `FOUNDRY_VTT_URL` output.
+1. Open that URL. Allow time for the container to start and download Foundry VTT.
+1. Confirm that the Foundry setup or login page opens before you share the URL with players.
+
+A successful workflow confirms that provisioning completed. It does not by itself prove that Foundry VTT started successfully. If the page does not open, inspect the selected compute service's container logs in Azure. Do not enable public storage or Key Vault access to work around a startup error.
+
+![Successful GitHub Actions production deployment with completed authentication and infrastructure provisioning steps](docs/images/github-actions-deployment-results.png)
+
+For later updates, change the required configuration and run the same workflow again. Keep the environment and resource group names unchanged unless you intend to deploy a separate server.
+
+### Troubleshooting GitHub Actions deployment
+
+| Symptom | What to check |
+| --- | --- |
+| **Run workflow** is missing | Enable Actions in your fork. Confirm the workflow exists on the default branch and has `workflow_dispatch`. Confirm you have write access. |
+| The deployment job is skipped | Run from `main`. The supplied caller rejects other branches. |
+| The job waits for approval | Check the `Production` environment protection rules and request an authorized review. |
+| Federation fails or Azure reports no matching credential | Check the tenant and client IDs. Match the issuer, audience, owner, repository, and `Production` environment in the federated credential. |
+| A required value is missing or empty | Check all six secrets and the variables on the `Production` environment. Match names exactly. Do not print secret values while you debug. |
+| Azure denies `roleAssignments/write` | `Contributor` is not sufficient. Have an administrator check the deployment principal's role-assignment permissions and any conditions. |
+| Provisioning succeeds but Foundry does not start | Check the Foundry credentials, image tag, container startup logs, and storage/network configuration. Keep secrets out of screenshots and issue reports. |
 
 ---
 
