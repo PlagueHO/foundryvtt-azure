@@ -315,6 +315,8 @@ You do not need to install `azd` locally for this deployment method. The workflo
 1. Enter `Production`, then select **Configure environment**.
 1. If available for your repository and GitHub plan, configure required reviewers and restrict deployment branches to `main`.
 
+![GitHub new environment form with Production entered and the Configure environment button](docs/images/github-actions-create-environment.png)
+
 The GitHub Environment name `Production` is separate from `AZURE_ENV_NAME`, which names the Azure deployment. Keep both names consistent across later runs to update the same deployment.
 
 > [!IMPORTANT]
@@ -332,13 +334,23 @@ For Azure portal setup, follow [Microsoft Learn: Authenticate to Azure from GitH
 | --- | --- |
 | Federated credential scenario | GitHub Actions deploying Azure resources |
 | Organization and repository | The owner and name of your deployment repository, including your fork if used |
+| Organization ID and repository ID | The numeric owner and repository IDs from GitHub, when using an immutable subject |
 | Entity type | Environment |
 | Environment | `Production` |
 | Issuer | `https://token.actions.githubusercontent.com` |
 | Audience | `api://AzureADTokenExchange` |
-| Subject | `repo:<owner>/<repository>:environment:Production` |
+| Subject with immutable IDs | `repo:<owner>@<owner-id>/<repository>@<repository-id>:environment:Production` |
+| Subject for a repository that still uses the name-based format | `repo:<owner>/<repository>:environment:Production` |
 
 Use the exact owner, repository, and environment spelling in the subject. Do not use a branch-based subject for this workflow because its deployment job uses a GitHub Environment.
+
+Check your repository's OIDC settings before you create the credential. The Azure subject must match the subject that GitHub issues. GitHub.com repositories created, renamed, or transferred after July 15, 2026 use immutable subjects. Older repositories keep the name-based format unless they opt in. A new fork can therefore need a different subject format from its source repository. If your repository uses a custom subject, use that exact value instead. See [GitHub: OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+
+The Azure portal now generates an immutable subject from the organization and repository IDs. For a repository that still uses a name-based subject, select **Edit (optional)** beside **Subject identifier** and enter the matching name-based value. The screenshot below shows this unsaved example for `PlagueHO/foundryvtt-azure`. The ID fields are disabled because the subject was entered directly. Do not copy this repository's subject into a credential for your fork.
+
+![Azure federated credential form with a manually entered name-based Production subject, GitHub issuer, and Azure token exchange audience](docs/images/github-actions-federated-credential.png)
+
+Prefer immutable subjects for new setup. To migrate an existing deployment, follow [Microsoft Learn: Migrate GitHub Actions federated credentials to immutable subjects](https://learn.microsoft.com/en-us/entra/workload-id/workload-identities-github-immutable-subjects). Coordinate the GitHub OIDC setting and Azure credential changes so they continue to match.
 
 Alternatively, run this example with the `Az.Accounts` and `Az.Resources` PowerShell modules installed. Replace each placeholder before you run it. This example creates a new application and grants subscription-level deployment permissions.
 
@@ -349,7 +361,7 @@ Import-Module Az.Resources
 
 $tenantId = '<azure-tenant-id>'
 $subscriptionId = '<azure-subscription-id>'
-$repository = '<owner>/<repository>'
+$subject = '<exact-Production-subject-from-your-repository-OIDC-settings>'
 $credentialName = 'github-foundryvtt-production'
 
 Connect-AzAccount -Tenant $tenantId
@@ -363,7 +375,7 @@ New-AzADAppFederatedCredential `
   -ApplicationObjectId $application.Id `
   -Issuer 'https://token.actions.githubusercontent.com' `
   -Audience 'api://AzureADTokenExchange' `
-  -Subject "repo:${repository}:environment:Production"
+  -Subject $subject
 
 New-AzRoleAssignment `
   -ObjectId $servicePrincipal.Id `
@@ -477,6 +489,8 @@ See [GitHub: Run a workflow manually](https://docs.github.com/en/actions/how-tos
 1. Confirm that the Foundry setup or login page opens before you share the URL with players.
 
 A successful workflow confirms that provisioning completed. It does not by itself prove that Foundry VTT started successfully. If the page does not open, inspect the selected compute service's container logs in Azure. Do not enable public storage or Key Vault access to work around a startup error.
+
+![Successful GitHub Actions production deployment with completed authentication and infrastructure provisioning steps](docs/images/github-actions-deployment-results.png)
 
 For later updates, change the required configuration and run the same workflow again. Keep the environment and resource group names unchanged unless you intend to deploy a separate server.
 
