@@ -10,6 +10,14 @@ on:
       - infra/**
   workflow_dispatch:
     inputs:
+      PRODUCTION_RECOVERY:
+        description: "Run separately approved compute-only production recovery. Requires a protected snapshot and registered cleanup."
+        type: boolean
+        default: false
+      RECOVERY_MANIFEST_BASE64:
+        description: "Approved production recovery manifest. No credentials or secret values."
+        type: string
+        default: ''
       WEB_APP_ONLY:
         description: "Run only the two sequential Web App tests. Paid resources require separate approval."
         type: boolean
@@ -59,7 +67,19 @@ jobs:
           POLICY_DIAGNOSTICS_ONLY: ${{ inputs.POLICY_DIAGNOSTICS_ONLY }}
           PRIVATE_STARTUP_TEST: ${{ inputs.PRIVATE_STARTUP_TEST }}
           PRIVATE_ACCESS_TEST: ${{ inputs.PRIVATE_ACCESS_TEST }}
+          PRODUCTION_RECOVERY: ${{ inputs.PRODUCTION_RECOVERY }}
+          RECOVERY_MANIFEST_BASE64: ${{ inputs.RECOVERY_MANIFEST_BASE64 }}
         run: |
+          if ($Env:PRODUCTION_RECOVERY -eq 'true' -and
+              ([string]::IsNullOrWhiteSpace($Env:RECOVERY_MANIFEST_BASE64) -or
+               $Env:PRIVATE_STARTUP_TEST -eq 'true' -or $Env:PRIVATE_ACCESS_TEST -eq 'true' -or
+               $Env:POLICY_DIAGNOSTICS_ONLY -eq 'true' -or $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -or
+               -not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME))) {
+            throw 'Production recovery requires its own approved manifest and cannot be combined with test diagnostics.'
+          }
+          if ($Env:PRODUCTION_RECOVERY -ne 'true' -and -not [string]::IsNullOrEmpty($Env:RECOVERY_MANIFEST_BASE64)) {
+            throw 'A recovery manifest cannot be used outside production recovery mode.'
+          }
           if ($Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -and [string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME)) {
             throw 'Mount evidence capture requires an existing isolated test environment name. No deployment was started.'
           }
@@ -81,12 +101,13 @@ jobs:
 
   lint-and-publish-bicep:
     needs: validate-inputs
-    if: inputs.DIAGNOSTIC_ENV_NAME == ''
+    if: inputs.DIAGNOSTIC_ENV_NAME == '' && !inputs.PRODUCTION_RECOVERY
     uses: ./.github/workflows/lint-and-publish-bicep.yml
 
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-webapp:
     name: Test WebApp Deployment with Networking
+    if: ${{ !inputs.PRODUCTION_RECOVERY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - lint-and-publish-bicep
@@ -110,7 +131,7 @@ jobs:
 
   test-webapp-without-networking:
     name: Test WebApp Deployment without Networking
-    if: ${{ always() && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
+    if: ${{ always() && !inputs.PRODUCTION_RECOVERY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp
@@ -133,7 +154,7 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-app:
     name: Test Container App Deployment
-    if: ${{ !inputs.WEB_APP_ONLY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST }}
+    if: ${{ !inputs.PRODUCTION_RECOVERY && !inputs.WEB_APP_ONLY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp-without-networking
@@ -153,6 +174,7 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-instance:
     name: Test Container Instance Deployment
+    if: ${{ !inputs.PRODUCTION_RECOVERY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-container-app
@@ -190,6 +212,21 @@ jobs:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
+
+  recover-production:
+    needs: validate-inputs
+    if: inputs.PRODUCTION_RECOVERY
+    uses: ./.github/workflows/recover-production-compute.yml
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    with:
+      MANIFEST_BASE64: ${{ inputs.RECOVERY_MANIFEST_BASE64 }}
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   diagnose-vault-policy:
     name: Read Retained Test Vault Policy Operations

@@ -216,6 +216,18 @@ Import-Module Pester -MinimumVersion 5.0
 Invoke-Pester -Path .\tests\Test-WebAppInfrastructure.Tests.ps1 -Output Detailed
 ```
 
+### Bounded production recovery
+
+Use `infra\recovery.bicep` and `scripts\Invoke-ProductionWebAppRecovery.ps1` only after separate production approval. This path creates compute against existing data services. It does not redeploy storage, Key Vault, or secrets. Normal Foundry startup can write production files; this is not read-only verification.
+
+The approved JSON manifest specifies the exact subscription, resource group, repository, environment, storage account, vault, unique recovery ID, and resource limits. The current runner permits New Zealand North, one P0v3 instance, the proxy on that plan, a NZ$5 operating limit, 90-minute compute cleanup, and one share snapshot retained for at most 24 hours. These are operating limits, not cloud-enforced spending or retention guarantees.
+
+With an existing Azure CLI login, run `Preflight` and then `Snapshot`. Preflight rejects existing compute, conflicting production operations, and changes to data services. It accepts [what-if `Ignore` records](https://learn.microsoft.com/azure/azure-resource-manager/bicep/deploy-what-if#change-types) for existing resources but rejects their redeployment, including `NoChange`. Register and read back the approved one-time snapshot cleanup before `Run`. Pass that registration ID with `-CleanupAutomationId`. Keep the cleanup host and Copilot available.
+
+The runner creates apps disabled, verifies routing and the new app's secrets role before startup, captures safe SMB and application-container evidence, and always removes only attempt-owned compute. A valid mapping or successful FileREST request does not prove a CIFS mount. `CleanupSnapshot` requires the exact snapshot timestamp and preserves the live share and other snapshots. Do not use full `azd provision` or `azd down` for recovery.
+
+For the protected workflow path, dispatch `continuous-testing.yml` with `PRODUCTION_RECOVERY=true` and `RECOVERY_MANIFEST_BASE64` containing the approved manifest, verified snapshot, and cleanup registration. Other paid compute modes are skipped. The manifest must match the Production environment variables and subscription. Do not include credentials or secret values.
+
 ---
 
 ## Outputs

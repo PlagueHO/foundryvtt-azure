@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a separately approved compute-only production recovery path with a verified share snapshot, disabled-first startup, bounded diagnostics, and ownership-checked compute and snapshot cleanup. Existing storage and vault secrets are not redeployed.
+
 - Added a separately approved private access test that captures network and identity evidence before cleanup, enables filesystem logs, and uses a temporary test-mount control to check private DNS, TCP 445, and signed storage access from the same application container.
 - Added read-only inspection of retained policy operations for an exact test vault and storage account, plus selected storage access evaluations after cleanup, without provisioning resources or changing access.
 - Added a separately approved private-only startup comparison that records mount state and checks readiness after unchanged mapping replay, before adding a container mount probe.
