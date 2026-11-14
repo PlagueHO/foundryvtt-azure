@@ -61,6 +61,7 @@ on:
 jobs:
   test-infrastructure:
     name: Test ${{ inputs.ENVIRONMENT }} Infrastructure
+    timeout-minutes: 90
     env:
       # Required for azd to authenticate with Azure using Federated Credentials
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -111,6 +112,7 @@ jobs:
         shell: pwsh
 
       - name: Provision Infrastructure
+        timeout-minutes: 20
         shell: pwsh
         run: |
           # Stream output to logs while also capturing it for targeted failure handling.
@@ -132,6 +134,7 @@ jobs:
           
       - name: Check Web App routing, references, and HTTP readiness
         if: env.AZURE_COMPUTE_SERVICE == 'Web App'
+        timeout-minutes: 40
         shell: pwsh
         run: |
           $storageAccountName = $Env:AZURE_ENV_NAME.Replace('-', '').ToLowerInvariant()
@@ -157,4 +160,5 @@ jobs:
 
       - name: Delete Infrastructure
         if: always()
+        timeout-minutes: 15
         run: azd down --no-prompt --purge --force

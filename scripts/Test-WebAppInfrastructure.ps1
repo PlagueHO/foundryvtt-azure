@@ -6,6 +6,7 @@
 .DESCRIPTION
     Uses the existing azd login for read-only Azure Resource Manager checks.
     Checks the Azure Files configuration and the Foundry HTTP response.
+    Reports readiness failure reasons without printing HTTP response bodies.
     An optional mountinfo file must come from the running application container,
     not the SCM container. Without this evidence, runtime mount verification
     remains blocked. The script does not deploy resources or change access.
@@ -99,7 +100,7 @@ try {
     }
     $headers = @{ Authorization = "Bearer $token" }
 
-    $app = Invoke-RestMethod -Uri "$appUri`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+    $app = Invoke-RestMethod -Uri "$appUri`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
     if ($app.properties.outboundVnetRouting.allTraffic -ne $expectedRouting) {
         throw "The Web App allTraffic routing setting does not match Networking=$Networking."
     }
@@ -111,7 +112,7 @@ try {
         throw 'The Web App response has no default hostname.'
     }
 
-    $storage = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+    $storage = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
     $mount = $storage.properties.foundrydata
     if ($mount.accountName -ne $StorageAccountName -or $mount.shareName -ne 'foundryvttdata' -or
         $mount.mountPath -ne '/data' -or $mount.type -ne 'AzureFiles' -or $mount.protocol -ne 'Smb') {
@@ -131,32 +132,50 @@ try {
     $ready = $false
     for ($attempt = 1; $attempt -le $RetryCount; $attempt++) {
         $unresolved = @()
+        $referenceRequestFailed = $false
         foreach ($referenceName in $referenceNames) {
-            $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30
+            try {
+                $reference = Invoke-RestMethod -Uri "$appUri/config/configreferences/appsettings/$referenceName`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+            } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+                throw
+            } catch [System.IO.IOException], [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
+                $referenceRequestFailed = $true
+                $unresolved += "$referenceName=ManagementRequestFailed"
+                Write-Warning "The Azure management request failed for $referenceName on attempt ${attempt}. Retrying within the configured readiness limit."
+                break
+            }
             if ($reference.properties.status -ne 'Resolved') {
-                $unresolved += $referenceName
+                $unresolved += "$referenceName=$($reference.properties.status)"
             }
         }
 
         $ready = $false
+        $readinessStatus = if ($referenceRequestFailed) { 'Key Vault reference status request failed.' } else { 'Key Vault references are unresolved.' }
         if ($unresolved.Count -eq 0) {
             try {
                 $response = Invoke-WebRequest -Uri "https://$($app.properties.defaultHostName)/" -SkipHttpErrorCheck -TimeoutSec 30
-                $ready = $response.StatusCode -eq 200 -and $response.Content -match '<title>[^<]*Foundry Virtual Tabletop[^<]*</title>'
+                if ($response.StatusCode -ne 200) {
+                    $readinessStatus = "HTTP status $([int]$response.StatusCode)."
+                } elseif ($response.Content -notmatch '<title>[^<]*Foundry Virtual Tabletop[^<]*</title>') {
+                    $readinessStatus = 'HTTP 200 response does not identify Foundry.'
+                } else {
+                    $ready = $true
+                }
             } catch [System.Net.Http.HttpRequestException], [System.Net.WebException], [System.Threading.Tasks.TaskCanceledException] {
+                $readinessStatus = 'HTTP request failed.'
                 Write-Warning "The Web App HTTP request failed on attempt ${attempt}: $($_.Exception.Message). Retrying within the configured limit."
             }
         }
         if ($ready) {
             break
         }
-        Write-Information "Readiness attempt $attempt/$RetryCount. Unresolved references: $($unresolved -join ', ')." -InformationAction Continue
+        Write-Information "Readiness attempt $attempt/$RetryCount. $readinessStatus Unresolved or unchecked references: $($unresolved -join ', ')." -InformationAction Continue
         if ($attempt -lt $RetryCount) {
             Start-Sleep -Seconds $RetryIntervalSeconds
         }
     }
     if (-not $ready) {
-        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts."
+        throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts. Last readiness result: $readinessStatus Unresolved or unchecked references: $($unresolved -join ', ')."
     }
     if (-not $runtimeMountVerified) {
         Write-Warning 'Runtime /data mount verification is BLOCKED: supply mountinfo from the application container. Routing, configuration, and HTTP readiness do not prove the mount.'

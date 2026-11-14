@@ -30,6 +30,13 @@ Describe 'Compiled Foundry Web App routing' {
         ($deployment.properties.parameters.siteConfig.value.PSObject.Properties.Name -contains 'vnetRouteAllEnabled') |
             Should -BeFalse
     }
+
+    It 'sets Key Vault public access explicitly for both networking modes' {
+        $template.resources.keyVault.properties.parameters.publicNetworkAccess |
+            Should -Be "[if(variables('effectiveDeployNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]"
+        $template.resources.keyVault.properties.parameters.networkAcls.value.defaultAction |
+            Should -Be "[if(variables('effectiveDeployNetworking'), 'Deny', 'Allow')]"
+    }
 }
 
 Describe 'Test Web App checks' {
@@ -112,7 +119,8 @@ Describe 'Test Web App checks' {
 
     It 'stops after the retry limit when any Key Vault reference remains unresolved' {
         $referenceState.Status = 'AccessToKeyVaultDenied'
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: Key Vault references are unresolved.*FOUNDRY_USERNAME=AccessToKeyVaultDenied*STORAGE_ACCOUNT_KEY=AccessToKeyVaultDenied*'
         Should -Invoke Invoke-RestMethod -Times 8 -Exactly -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
         Should -Invoke Start-Sleep -Times 1 -Exactly
         Should -Invoke Invoke-WebRequest -Times 0 -Exactly
@@ -129,9 +137,63 @@ Describe 'Test Web App checks' {
         Should -Invoke Invoke-WebRequest -Times 1 -Exactly
     }
 
+    It 'retries a reset management connection within the readiness limit' {
+        Mock Invoke-RestMethod {
+            $referenceState.Reads++
+            if ($referenceState.Reads -eq 1) {
+                throw [System.IO.IOException]::new('Connection reset by peer.')
+            }
+            @{ properties = @{ status = 'Resolved' } }
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        (& $checkScript @checkParameters).KeyVaultReferencesVerified | Should -BeTrue
+        Should -Invoke Start-Sleep -Times 1 -Exactly
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*management request failed*FOUNDRY_USERNAME*' }
+    }
+
+    It 'reports an unreadable reference status when management connections keep resetting' {
+        Mock Invoke-RestMethod {
+            throw [System.IO.IOException]::new('Connection reset by peer.')
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: Key Vault reference status request failed.*FOUNDRY_USERNAME=ManagementRequestFailed*'
+        Should -Invoke Invoke-RestMethod -Times 2 -Exactly -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        Should -Invoke Start-Sleep -Times 1 -Exactly
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
+    It 'does not treat a management permission error as a reset connection' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Management access forbidden.', $response)
+        } -ParameterFilter { $Uri -like '*/config/configreferences/appsettings/*' }
+        { & $checkScript @checkParameters } | Should -Throw '*Management access forbidden*'
+        Should -Invoke Start-Sleep -Times 0 -Exactly
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
     It 'does not accept an HTTP 200 platform page as Foundry readiness' {
-        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>' } }
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = '<title>App Service</title>private-response-marker' } }
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: HTTP 200 response does not identify Foundry.*'
+        Should -Invoke Write-Information -Times 2 -Exactly -ParameterFilter {
+            $MessageData -like '*HTTP 200 response does not identify Foundry.*' -and
+                $MessageData -notlike '*private-response-marker*'
+        }
+    }
+
+    It 'reports HTTP <StatusCode> without printing the response body' -TestCases @(
+        @{ StatusCode = 403 }
+        @{ StatusCode = 503 }
+    ) {
+        param($StatusCode)
+        $httpFailure = @{ StatusCode = $StatusCode; Content = 'private-response-marker' }
+        Mock Invoke-WebRequest { $httpFailure }
+        { & $checkScript @checkParameters } |
+            Should -Throw "*within 2 attempts*Last readiness result: HTTP status $StatusCode.*"
+        Should -Invoke Write-Information -Times 2 -Exactly -ParameterFilter {
+            $MessageData -like "*HTTP status $StatusCode.*" -and
+                $MessageData -notlike '*private-response-marker*'
+        }
     }
 
     It 'retries an HTTP timeout before Foundry becomes ready' {
@@ -153,7 +215,8 @@ Describe 'Test Web App checks' {
         Mock Invoke-WebRequest {
             throw [System.Threading.Tasks.TaskCanceledException]::new('HTTP request timed out.')
         }
-        { & $checkScript @checkParameters } | Should -Throw '*within 2 attempts*'
+        { & $checkScript @checkParameters } |
+            Should -Throw '*within 2 attempts*Last readiness result: HTTP request failed.*'
         Should -Invoke Invoke-WebRequest -Times 2 -Exactly
         Should -Invoke Start-Sleep -Times 1 -Exactly
     }

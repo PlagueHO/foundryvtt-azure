@@ -166,13 +166,17 @@ For a full list, see the [infra/main.bicepparam](infra/main.bicepparam) file.
 
 For the Foundry Web App, `AZURE_DEPLOY_NETWORKING=true` sets the AVM module parameter `outboundVnetRouting.allTraffic` to `true`. This routes application and configuration traffic through VNet integration, including Key Vault access and content-share traffic. The template does not use the old nested `siteConfig.vnetRouteAllEnabled` setting. See [App Service VNet routing](https://learn.microsoft.com/azure/app-service/configure-vnet-integration-routing).
 
-With networking disabled, `allTraffic` is `false` and the app has no VNet integration. Existing public-endpoint behaviour is unchanged. Do not enable public storage access to work around a failed private mount.
+With networking disabled, `allTraffic` is `false` and the app has no VNet integration. Key Vault public access is explicitly disabled with networking enabled and enabled with networking disabled. This preserves the intended public-endpoint behaviour without relying on a module or service default. Key Vault still requires authentication and the assigned secrets role in both modes. Do not enable public storage access to work around a failed private mount.
 
 ### Verify an isolated Web App test
 
 Obtain approval for the test subscription, region, resource limits, cost limit, and Foundry licence use before deployment. Do not use production resources. The test workflow runs Web App cases with networking enabled and disabled in series, then deletes each test deployment.
 
+Test steps have time limits. Cleanup runs after successful and failed checks.
+
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
+
+On failure, the checker reports unresolved reference names and statuses, failed management or HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. Reference-status transport failures retry within the existing readiness limit and are not reported as confirmed reference failures. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
 
 Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
 

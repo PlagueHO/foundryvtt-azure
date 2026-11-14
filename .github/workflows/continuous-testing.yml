@@ -32,7 +32,7 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
-      AZURE_DEPLOY_NETWORKING: 'true'
+      AZURE_DEPLOY_NETWORKING: ${{ 'true' }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -52,7 +52,7 @@ jobs:
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
-      AZURE_DEPLOY_NETWORKING: 'false'
+      AZURE_DEPLOY_NETWORKING: ${{ 'false' }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
