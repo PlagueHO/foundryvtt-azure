@@ -10,6 +10,8 @@
     An optional mountinfo file must come from the running application container,
     not the SCM container. Without this evidence, runtime mount verification
     remains blocked. The script does not deploy resources or change access.
+    DiagnosticsOnly reports selected live settings and fixed container-log
+    failure markers. It does not print raw logs or confirm a startup cause.
 
 .PARAMETER SubscriptionId
     The subscription containing the test Web App.
@@ -31,6 +33,9 @@
 
 .PARAMETER MountInfoPath
     A local file containing /proc/self/mountinfo from the application container.
+
+.PARAMETER DiagnosticsOnly
+    Collects bounded read-only failure diagnostics instead of readiness checks.
 
 .PARAMETER RetryCount
     Maximum number of reference and readiness checks.
@@ -78,6 +83,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$MountInfoPath,
 
+    [switch]$DiagnosticsOnly,
+
     [ValidateRange(1, 60)] # At most 60 polling attempts.
     [int]$RetryCount = 60,
 
@@ -99,6 +106,111 @@ try {
         throw 'Cannot obtain an Azure Resource Manager token from azd.'
     }
     $headers = @{ Authorization = "Bearer $token" }
+
+    if ($DiagnosticsOnly) {
+        $diagnosticsFailed = $false
+        $diagnosticSettings = [ordered]@{
+            AppState = 'Unknown'
+            SharedKeyAccess = 'Unknown'
+            StoragePublicNetworkAccess = 'Unknown'
+            ShareProtocol = 'Unknown'
+        }
+        $storageUri = "https://management.azure.com/subscriptions/$([uri]::EscapeDataString($SubscriptionId))/resourceGroups/$([uri]::EscapeDataString($ResourceGroupName))/providers/Microsoft.Storage/storageAccounts/$StorageAccountName"
+        foreach ($target in @(
+            @{ Name = 'App'; Uri = "$appUri`?api-version=$apiVersion" }
+            @{ Name = 'StorageAccount'; Uri = "$storageUri`?api-version=2024-01-01" }
+            @{ Name = 'Share'; Uri = "$storageUri/fileServices/default/shares/foundryvttdata?api-version=2024-01-01" }
+        )) {
+            try {
+                $details = Invoke-RestMethod -Uri $target.Uri -Headers $headers -TimeoutSec 30
+                switch ($target.Name) {
+                    'App' {
+                        if ($details.properties.state -in @('Running', 'Stopped')) {
+                            $diagnosticSettings.AppState = $details.properties.state
+                        }
+                    }
+                    'StorageAccount' {
+                        if ($details.properties.allowSharedKeyAccess -is [bool]) {
+                            $diagnosticSettings.SharedKeyAccess = $details.properties.allowSharedKeyAccess
+                        }
+                        if ($details.properties.publicNetworkAccess -in @('Enabled', 'Disabled', 'SecuredByPerimeter')) {
+                            $diagnosticSettings.StoragePublicNetworkAccess = $details.properties.publicNetworkAccess
+                        }
+                    }
+                    'Share' {
+                        if ($details.properties.enabledProtocols -in @('SMB', 'NFS')) {
+                            $diagnosticSettings.ShareProtocol = $details.properties.enabledProtocols
+                        }
+                    }
+                }
+            } catch {
+                $diagnosticsFailed = $true
+                $failureStatus = if ($_.Exception -is [Microsoft.PowerShell.Commands.HttpResponseException]) {
+                    "HTTP $([int]$_.Exception.Response.StatusCode)"
+                } else { 'Request failed' }
+                Write-Warning "$($target.Name) diagnostic request failed ($failureStatus). Response details are not printed."
+            }
+        }
+        $diagnosticSettings.GetEnumerator() | ForEach-Object {
+            Write-Information "Startup diagnostic $($_.Key): $($_.Value)." -InformationAction Continue
+        }
+
+        $logStatus = 'Unavailable'
+        $failureMarkers = @()
+        try {
+            $logResponse = Invoke-WebRequest -Method Post -Uri "$appUri/containerlogs?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRedirection 0
+            $startupLogs = $null
+            if ($logResponse.StatusCode -notin @(200, 204)) {
+                $diagnosticsFailed = $true
+                Write-Warning "Container log diagnostic request returned HTTP $([int]$logResponse.StatusCode). Response details are not printed."
+            } elseif ($logResponse.StatusCode -eq 204 -or [string]::IsNullOrWhiteSpace($logResponse.Content)) {
+                Write-Warning 'Container logs are unavailable. The startup cause remains unconfirmed.'
+            } else {
+                if ($logResponse.Content -is [string]) {
+                    $startupLogs = $logResponse.Content
+                } elseif ($logResponse.Content -is [byte[]]) {
+                    try {
+                        $startupLogs = [System.Text.UTF8Encoding]::new($false, $true).GetString($logResponse.Content)
+                    } catch [System.Text.DecoderFallbackException] {
+                        $startupLogs = $null
+                    }
+                }
+                if ($null -eq $startupLogs -or $startupLogs -match '[\x00-\x08\x0B\x0C\x0E-\x1F]') {
+                    $diagnosticsFailed = $true
+                    $startupLogs = $null
+                    Write-Warning 'Container logs have an unsupported response format. Raw content is not printed.'
+                }
+            }
+            if ($null -ne $startupLogs) {
+                $logStatus = 'Read'
+                $startupLogs = $startupLogs.Substring([Math]::Max(0, $startupLogs.Length - 65536))
+                foreach ($marker in @('BYOSFailure', 'ImagePullFailure', 'ContainerStartFailure')) {
+                    if ($startupLogs -match "\b$marker\b") {
+                        $failureMarkers += $marker
+                    }
+                }
+                $markerSummary = if ($failureMarkers.Count -gt 0) { $failureMarkers -join ', ' } else { 'None detected in the inspected log tail' }
+                Write-Information "Container log failure markers: $markerSummary. These observations do not confirm the startup cause or the runtime mount." -InformationAction Continue
+            }
+        } catch {
+            $diagnosticsFailed = $true
+            $failureStatus = if ($_.Exception -is [Microsoft.PowerShell.Commands.HttpResponseException]) {
+                "HTTP $([int]$_.Exception.Response.StatusCode)"
+            } else { 'Request failed' }
+            Write-Warning "Container log diagnostic request failed ($failureStatus). Response details are not printed."
+        }
+        Write-Warning 'Runtime /data mount verification remains BLOCKED in diagnostic mode. Application-container mountinfo is still required.'
+        if ($diagnosticsFailed) {
+            throw 'One or more startup diagnostic requests failed. These failures do not replace the original readiness or provisioning failure.'
+        }
+        [pscustomobject]@{
+            Settings = [pscustomobject]$diagnosticSettings
+            ContainerLogStatus = $logStatus
+            FailureMarkers = $failureMarkers
+            RuntimeMountVerified = $false
+        }
+        return
+    }
 
     $app = Invoke-RestMethod -Uri "$appUri`?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
     if ($app.properties.outboundVnetRouting.allTraffic -ne $expectedRouting) {
@@ -188,5 +300,5 @@ try {
         RuntimeMountVerified = $runtimeMountVerified
     }
 } finally {
-    Remove-Variable -Name token, headers, storage, mount, reference -Force -ErrorAction SilentlyContinue
+    Remove-Variable -Name token, headers, storage, mount, reference, details, logResponse, startupLogs -Force -ErrorAction SilentlyContinue
 }

@@ -239,4 +239,139 @@ Describe 'Test Web App checks' {
         { & $checkScript @checkParameters } | Should -Throw '*Cannot obtain*'
         Should -Invoke Invoke-RestMethod -Times 0 -Exactly
     }
+
+    It 'collects live diagnostic settings and fixed log markers without printing secrets or checking readiness' {
+        $checkParameters.DiagnosticsOnly = $true
+        $appProperties.state = 'Running'
+        Mock Invoke-RestMethod {
+            @{ properties = @{ allowSharedKeyAccess = $false; publicNetworkAccess = 'Disabled'; accessKey = 'private-response-marker' } }
+        } -ParameterFilter { $Uri -like '*/storageAccounts/fvtttest?*' }
+        Mock Invoke-RestMethod {
+            @{ properties = @{ enabledProtocols = 'SMB' } }
+        } -ParameterFilter { $Uri -like '*/shares/foundryvttdata?*' }
+        Mock Invoke-WebRequest {
+            @{ StatusCode = 200; Content = 'BYOSFailure private-response-marker test-token' }
+        }
+
+        $result = & $checkScript @checkParameters
+        $result.Settings.AppState | Should -Be 'Running'
+        $result.Settings.SharedKeyAccess | Should -BeFalse
+        $result.Settings.StoragePublicNetworkAccess | Should -Be 'Disabled'
+        $result.Settings.ShareProtocol | Should -Be 'SMB'
+        $result.ContainerLogStatus | Should -Be 'Read'
+        $result.FailureMarkers | Should -Contain 'BYOSFailure'
+        $result.RuntimeMountVerified | Should -BeFalse
+        ($result | ConvertTo-Json -Depth 3) | Should -Not -Match 'private-response-marker|test-token'
+        Should -Invoke Invoke-WebRequest -Times 1 -Exactly -ParameterFilter {
+            $Method -eq 'Post' -and $Uri -like 'https://management.azure.com/*/sites/fvtt-test/containerlogs?*'
+        }
+        Should -Invoke Invoke-RestMethod -Times 0 -Exactly -ParameterFilter { $Uri -like '*/config/*' }
+        Should -Invoke Write-Information -Times 0 -Exactly -ParameterFilter { $MessageData -match 'private-response-marker|test-token' }
+    }
+
+    It 'reports diagnostic permission errors while continuing the remaining diagnostic reads' {
+        $checkParameters.DiagnosticsOnly = $true
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('private-response-marker test-token', $response)
+        } -ParameterFilter { $Uri -like '*/storageAccounts/fvtttest?*' }
+        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = 'ImagePullFailure' } }
+
+        { & $checkScript @checkParameters } | Should -Throw '*diagnostic requests failed*original readiness or provisioning failure*'
+        Should -Invoke Invoke-RestMethod -Times 1 -Exactly -ParameterFilter { $Uri -like '*/shares/foundryvttdata?*' }
+        Should -Invoke Invoke-WebRequest -Times 1 -Exactly
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*StorageAccount*HTTP 403*' }
+        Should -Invoke Write-Warning -Times 0 -Exactly -ParameterFilter { $Message -match 'private-response-marker|test-token' }
+    }
+
+    It 'reports unavailable logs without treating them as runtime mount evidence' -TestCases @(
+        @{ StatusCode = 200 }
+        @{ StatusCode = 204 }
+    ) {
+        param($StatusCode)
+        $checkParameters.DiagnosticsOnly = $true
+        $emptyLogs = @{ StatusCode = $StatusCode; Content = '' }
+        Mock Invoke-WebRequest { $emptyLogs }
+
+        $result = & $checkScript @checkParameters
+        $result.ContainerLogStatus | Should -Be 'Unavailable'
+        $result.FailureMarkers.Count | Should -Be 0
+        $result.RuntimeMountVerified | Should -BeFalse
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*logs are unavailable*' }
+    }
+
+    It 'rejects <Format> container log content without printing it' -TestCases @(
+        @{ Format = 'archive'; Content = [byte[]](80, 75, 3, 4) }
+        @{ Format = 'invalid UTF-8'; Content = [byte[]](255, 254) }
+    ) {
+        param($Content)
+        $checkParameters.DiagnosticsOnly = $true
+        $unsupportedLogs = @{ StatusCode = 200; Content = $Content }
+        Mock Invoke-WebRequest { $unsupportedLogs }
+
+        { & $checkScript @checkParameters } | Should -Throw '*diagnostic requests failed*'
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*unsupported response format*' }
+    }
+
+    It 'reads UTF-8 container logs returned as octet-stream content' {
+        $checkParameters.DiagnosticsOnly = $true
+        Mock Invoke-WebRequest {
+            @{ StatusCode = 200; Content = [System.Text.Encoding]::UTF8.GetBytes('BYOSFailure private-response-marker') }
+        }
+
+        $result = & $checkScript @checkParameters
+        $result.ContainerLogStatus | Should -Be 'Read'
+        $result.FailureMarkers | Should -Contain 'BYOSFailure'
+        Should -Invoke Write-Information -Times 0 -Exactly -ParameterFilter { $MessageData -like '*private-response-marker*' }
+    }
+
+    It 'limits log classification to the tail and does not invent a failure marker' {
+        $checkParameters.DiagnosticsOnly = $true
+        $longLogs = @{ StatusCode = 200; Content = 'ImagePullFailure' + ('x' * 70000) + ' ContainerStartFailure private-response-marker' }
+        Mock Invoke-WebRequest { $longLogs }
+
+        $result = & $checkScript @checkParameters
+        $result.FailureMarkers | Should -Contain 'ContainerStartFailure'
+        $result.FailureMarkers | Should -Not -Contain 'ImagePullFailure'
+        Should -Invoke Write-Information -Times 0 -Exactly -ParameterFilter { $MessageData -like '*private-response-marker*' }
+    }
+
+    It 'does not print unknown live property values' {
+        $checkParameters.DiagnosticsOnly = $true
+        Mock Invoke-RestMethod {
+            @{ properties = @{
+                state = 'private-response-marker'
+                allowSharedKeyAccess = 'test-token'
+                publicNetworkAccess = 'private-response-marker'
+                enabledProtocols = 'test-token'
+            } }
+        }
+        Mock Invoke-WebRequest { @{ StatusCode = 200; Content = 'No known failure marker.' } }
+
+        $result = & $checkScript @checkParameters
+        $result.Settings.AppState | Should -Be 'Unknown'
+        $result.Settings.SharedKeyAccess | Should -Be 'Unknown'
+        $result.Settings.StoragePublicNetworkAccess | Should -Be 'Unknown'
+        $result.Settings.ShareProtocol | Should -Be 'Unknown'
+        $result.FailureMarkers.Count | Should -Be 0
+        Should -Invoke Write-Information -Times 0 -Exactly -ParameterFilter { $MessageData -match 'private-response-marker|test-token' }
+    }
+
+    It 'keeps a container log transport failure separate from the original test failure' {
+        $checkParameters.DiagnosticsOnly = $true
+        Mock Invoke-WebRequest { throw [System.Net.Http.HttpRequestException]::new('private-response-marker test-token') }
+
+        { & $checkScript @checkParameters } | Should -Throw '*diagnostic requests failed*original readiness or provisioning failure*'
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*Container log diagnostic request failed*' }
+        Should -Invoke Write-Warning -Times 0 -Exactly -ParameterFilter { $Message -match 'private-response-marker|test-token' }
+    }
+
+    It 'rejects an unexpected container log HTTP response without printing its body' {
+        $checkParameters.DiagnosticsOnly = $true
+        Mock Invoke-WebRequest { @{ StatusCode = 202; Content = 'private-response-marker' } }
+
+        { & $checkScript @checkParameters } | Should -Throw '*diagnostic requests failed*'
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { $Message -like '*returned HTTP 202*' }
+        Should -Invoke Write-Warning -Times 0 -Exactly -ParameterFilter { $Message -like '*private-response-marker*' }
+    }
 }

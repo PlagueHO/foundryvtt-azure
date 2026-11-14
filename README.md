@@ -172,11 +172,15 @@ With networking disabled, `allTraffic` is `false` and the app has no VNet integr
 
 Obtain approval for the test subscription, region, resource limits, cost limit, and Foundry licence use before deployment. Do not use production resources. The test workflow runs Web App cases with networking enabled and disabled in series, then deletes each test deployment.
 
+For an approved test of only the private Web App, select `PRIVATE_WEBAPP_ONLY` when manually running `continuous-testing`. This option disables the optional DDB proxy. The public Web App and both other compute cases will be skipped. The default manual run and automatic runs retain the full test sequence and proxy settings. This option does not grant paid-test approval.
+
 Test steps have time limits. Cleanup runs after successful and failed checks.
 
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 
 On failure, the checker reports unresolved reference names and statuses, failed management or HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. Reference-status transport failures retry within the existing readiness limit and are not reported as confirmed reference failures. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
+
+After a failed Web App test, a separate diagnostic step runs before cleanup. It reads the live app state, storage shared-key and public-access settings, share protocol, and the last container logs through the [ARM container-log API](https://learn.microsoft.com/en-us/rest/api/appservice/web-apps/get-web-site-container-logs?view=rest-appservice-2025-03-01). It prints only selected settings and fixed failure markers from at most the last 65,536 characters of log text. It does not print raw logs, keys, tokens, or error response bodies. Diagnostic errors remain separate from the original test failure, and cleanup still runs. Missing logs, unsupported log formats, and unknown settings are explicit. A failure marker is not a confirmed startup cause or runtime mount evidence.
 
 Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
 
@@ -194,6 +198,8 @@ Save the captured text locally, then run the read-only check with the existing `
 ```
 
 Use `-Networking Disabled` for the case without networking. Without `-MountInfoPath`, the script reports `RuntimeMountVerified=false`. Record successful Foundry startup and private endpoint/DNS checks before accepting the fix. Delete only the isolated test resources with `azd down --no-prompt --purge --force`, including after a failed check.
+
+Use `-DiagnosticsOnly` with the same test resource parameters to collect failure diagnostics without readiness checks. This mode always leaves runtime mount verification blocked. It uses the existing azd identity and does not change resources or access. The identity must have permission to read the test storage settings and retrieve the app's container logs.
 
 Local regression checks require PowerShell 7 and Pester 5 or later:
 

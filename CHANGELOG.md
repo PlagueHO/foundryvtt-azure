@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
 - Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.
 - Added focused Web App regression checks and sequential test cases with networking enabled and disabled. Runtime Azure Files mount evidence remains a separate required check.
+- Added bounded Web App failure diagnostics before test cleanup. They report selected live storage settings and fixed container-log failure markers without printing raw logs or secrets. The startup cause and runtime mount still require separate evidence. Relates to #59.
+- Added a manual `PRIVATE_WEBAPP_ONLY` test option to keep an approved private Web App test separate from the other paid deployment cases. Normal full test runs are unchanged.
 
 ### Changed
 
