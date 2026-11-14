@@ -9,43 +9,6 @@ on:
     paths:
       - infra/**
   workflow_dispatch:
-    inputs:
-      PRODUCTION_RECOVERY:
-        description: "Run separately approved compute-only production recovery. Requires a protected snapshot and registered cleanup."
-        type: boolean
-        default: false
-      RECOVERY_MANIFEST_BASE64:
-        description: "Approved production recovery manifest. No credentials or secret values."
-        type: string
-        default: ''
-      WEB_APP_ONLY:
-        description: "Run only the two sequential Web App tests. Paid resources require separate approval."
-        type: boolean
-        default: false
-      PRIVATE_STARTUP_TEST:
-        description: "Run one paid private Web App test to compare startup before and after unchanged mount replay. Requires separate approval."
-        type: boolean
-        default: false
-      PRIVATE_ACCESS_TEST:
-        description: "One approved private access test with filesystem logs and a temporary mount-removal control. Requires separate cost and control approval."
-        type: boolean
-        default: false
-      DIAGNOSTIC_ENV_NAME:
-        description: "Read logs from an existing fvtt-asp-on/off test environment. Does not deploy or delete resources."
-        type: string
-        default: ''
-      CAPTURE_MOUNT_EVIDENCE:
-        description: "For an existing test only: add a Node mount probe and refresh Key Vault references. Restarts the test app."
-        type: boolean
-        default: false
-      POLICY_DIAGNOSTICS_ONLY:
-        description: "Read retained policy operations for an exact test vault, including after cleanup. Does not deploy or change access."
-        type: boolean
-        default: false
-
-concurrency:
-  group: ${{ inputs.DIAGNOSTIC_ENV_NAME && format('foundry-diagnostics-{0}', inputs.DIAGNOSTIC_ENV_NAME) || 'foundry-infrastructure-tests' }}
-  cancel-in-progress: false
   
 permissions:
   id-token: write
@@ -54,60 +17,12 @@ permissions:
   pull-requests: write
 
 jobs:
-  validate-inputs:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Validate diagnostic selection before Azure access
-        shell: pwsh
-        env:
-          DIAGNOSTIC_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
-          CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
-          POLICY_DIAGNOSTICS_ONLY: ${{ inputs.POLICY_DIAGNOSTICS_ONLY }}
-          PRIVATE_STARTUP_TEST: ${{ inputs.PRIVATE_STARTUP_TEST }}
-          PRIVATE_ACCESS_TEST: ${{ inputs.PRIVATE_ACCESS_TEST }}
-          PRODUCTION_RECOVERY: ${{ inputs.PRODUCTION_RECOVERY }}
-          RECOVERY_MANIFEST_BASE64: ${{ inputs.RECOVERY_MANIFEST_BASE64 }}
-        run: |
-          if ($Env:PRODUCTION_RECOVERY -eq 'true' -and
-              ([string]::IsNullOrWhiteSpace($Env:RECOVERY_MANIFEST_BASE64) -or
-               $Env:PRIVATE_STARTUP_TEST -eq 'true' -or $Env:PRIVATE_ACCESS_TEST -eq 'true' -or
-               $Env:POLICY_DIAGNOSTICS_ONLY -eq 'true' -or $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -or
-               -not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME))) {
-            throw 'Production recovery requires its own approved manifest and cannot be combined with test diagnostics.'
-          }
-          if ($Env:PRODUCTION_RECOVERY -ne 'true' -and -not [string]::IsNullOrEmpty($Env:RECOVERY_MANIFEST_BASE64)) {
-            throw 'A recovery manifest cannot be used outside production recovery mode.'
-          }
-          if ($Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -and [string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME)) {
-            throw 'Mount evidence capture requires an existing isolated test environment name. No deployment was started.'
-          }
-          if (-not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME) -and $Env:DIAGNOSTIC_ENV_NAME -notmatch '^fvtt-asp-(on|off)-\d+-\d+$') {
-            throw 'Diagnostics are limited to existing isolated Web App test names.'
-          }
-          if ($Env:POLICY_DIAGNOSTICS_ONLY -eq 'true' -and
-              ([string]::IsNullOrWhiteSpace($Env:DIAGNOSTIC_ENV_NAME) -or $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true')) {
-            throw 'Policy-only diagnostics require an exact test name and cannot capture mount evidence. No deployment was started.'
-          }
-          if (($Env:PRIVATE_STARTUP_TEST -eq 'true' -or $Env:PRIVATE_ACCESS_TEST -eq 'true') -and
-              (-not [string]::IsNullOrEmpty($Env:DIAGNOSTIC_ENV_NAME) -or
-               $Env:CAPTURE_MOUNT_EVIDENCE -eq 'true' -or $Env:POLICY_DIAGNOSTICS_ONLY -eq 'true')) {
-            throw 'The private startup test cannot be combined with existing-environment diagnostic inputs.'
-          }
-          if ($Env:PRIVATE_STARTUP_TEST -eq 'true' -and $Env:PRIVATE_ACCESS_TEST -eq 'true') {
-            throw 'Select only one private test mode. No deployment was started.'
-          }
-
   lint-and-publish-bicep:
-    needs: validate-inputs
-    if: inputs.DIAGNOSTIC_ENV_NAME == '' && !inputs.PRODUCTION_RECOVERY
     uses: ./.github/workflows/lint-and-publish-bicep.yml
 
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-webapp:
     name: Test WebApp Deployment with Networking
-    if: ${{ !inputs.PRODUCTION_RECOVERY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - lint-and-publish-bicep
@@ -118,9 +33,6 @@ jobs:
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
       AZURE_DEPLOY_NETWORKING: ${{ 'true' }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ (inputs.WEB_APP_ONLY || inputs.PRIVATE_STARTUP_TEST || inputs.PRIVATE_ACCESS_TEST) && 'false' || '' }}
-      CHECK_MOUNT_STARTUP_ORDER: ${{ inputs.PRIVATE_STARTUP_TEST }}
-      CHECK_PRIVATE_ACCESS: ${{ inputs.PRIVATE_ACCESS_TEST }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -131,7 +43,6 @@ jobs:
 
   test-webapp-without-networking:
     name: Test WebApp Deployment without Networking
-    if: ${{ always() && !inputs.PRODUCTION_RECOVERY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST && needs.test-webapp.outputs.CLEANUP_SUCCEEDED == 'true' }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp
@@ -142,7 +53,6 @@ jobs:
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
       AZURE_COMPUTE_SERVICE: 'Web App'
       AZURE_DEPLOY_NETWORKING: ${{ 'false' }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.WEB_APP_ONLY && 'false' || '' }}
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -154,7 +64,6 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-app:
     name: Test Container App Deployment
-    if: ${{ !inputs.PRODUCTION_RECOVERY && !inputs.WEB_APP_ONLY && !inputs.PRIVATE_STARTUP_TEST && !inputs.PRIVATE_ACCESS_TEST }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp-without-networking
@@ -174,7 +83,6 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-instance:
     name: Test Container Instance Deployment
-    if: ${{ !inputs.PRODUCTION_RECOVERY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-container-app
@@ -192,181 +100,3 @@ jobs:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
       FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
-
-  diagnose-webapp:
-    name: Read Existing Web App Test Diagnostics
-    needs: validate-inputs
-    if: inputs.DIAGNOSTIC_ENV_NAME != '' && !inputs.POLICY_DIAGNOSTICS_ONLY
-    uses: ./.github/workflows/test-infrastructure.yml
-    with:
-      ENVIRONMENT: WebApp
-      AZURE_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
-      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-{0}', inputs.DIAGNOSTIC_ENV_NAME) }}
-      AZURE_COMPUTE_SERVICE: 'Web App'
-      DIAGNOSTICS_ONLY: true
-      CAPTURE_MOUNT_EVIDENCE: ${{ inputs.CAPTURE_MOUNT_EVIDENCE }}
-    secrets:
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
-      FOUNDRY_ADMIN_KEY: ${{ secrets.FOUNDRY_ADMIN_KEY }}
-
-  recover-production:
-    needs: validate-inputs
-    if: inputs.PRODUCTION_RECOVERY
-    uses: ./.github/workflows/recover-production-compute.yml
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    with:
-      MANIFEST_BASE64: ${{ inputs.RECOVERY_MANIFEST_BASE64 }}
-    secrets:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-  diagnose-vault-policy:
-    name: Read Retained Test Vault Policy Operations
-    needs: validate-inputs
-    if: inputs.POLICY_DIAGNOSTICS_ONLY
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: WebApp
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      DIAGNOSTIC_ENV_NAME: ${{ inputs.DIAGNOSTIC_ENV_NAME }}
-    steps:
-      - name: Install azd
-        uses: Azure/setup-azd@v2.4.0
-      - name: Authenticate azd (Federated Credentials)
-        shell: pwsh
-        run: |
-          azd auth login `
-            --client-id "$Env:AZURE_CLIENT_ID" `
-            --federated-credential-provider "github" `
-            --tenant-id "$Env:AZURE_TENANT_ID"
-      - name: Read exact test vault policy operations
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          try {
-            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
-              throw 'Cannot obtain a token for read-only test policy diagnostics.'
-            }
-            $headers = @{ Authorization = "Bearer $token" }
-            $vaultName = 'kv' + $Env:DIAGNOSTIC_ENV_NAME.Replace('-', '')
-            $vaultName = $vaultName.Substring(0, [Math]::Min(24, $vaultName.Length))
-            $resourceId = "/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$Env:DIAGNOSTIC_ENV_NAME/providers/Microsoft.KeyVault/vaults/$vaultName"
-            $filter = [uri]::EscapeDataString("ResourceId eq '$resourceId' and PolicyDefinitionAction eq 'modify'")
-            $from = [uri]::EscapeDataString([DateTime]::UtcNow.AddDays(-1).ToString('o'))
-            $uri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.PolicyInsights/policyStates/default/queryResults?api-version=2019-10-01&`$filter=$filter&`$from=$from&`$top=100"
-            $states = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-            if (-not [string]::IsNullOrWhiteSpace($states.'@odata.nextLink')) {
-              throw 'More than 100 matching policy states exist. The policy inspection is incomplete.'
-            }
-            if (@($states.value).Count -eq 0) {
-              Write-Warning 'No retained modify policy states were found for the exact test vault. This does not exclude policy enforcement. Storage inspection will continue.'
-            }
-            "Retained modify policy states for the exact test vault: $(@($states.value).Count)." |
-              Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-            $definitions = @($states.value | Select-Object -ExpandProperty policyDefinitionId -Unique)
-            foreach ($definitionId in $definitions) {
-              $definition = Invoke-RestMethod -Uri "https://management.azure.com$definitionId`?api-version=2023-04-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-              $operations = @($definition.properties.policyRule.then.details.operations | Where-Object {
-                $_.field -eq 'Microsoft.KeyVault/vaults/publicNetworkAccess'
-              })
-              if ($operations.Count -eq 0) {
-                'Modify policy has no direct publicNetworkAccess operation.' |
-                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-              }
-              foreach ($operation in $operations) {
-                if ($operation.value -notin @('Enabled', 'Disabled')) {
-                  throw 'The publicNetworkAccess operation is not a literal Enabled or Disabled value. Assignment parameter evaluation is still required.'
-                }
-                "Vault policy operation: operation=$($operation.operation); field=$($operation.field); value=$($operation.value)." |
-                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-              }
-            }
-            $storageAccountName = $Env:DIAGNOSTIC_ENV_NAME.Replace('-', '').ToLowerInvariant()
-            $storageAccountName = $storageAccountName.Substring(0, [Math]::Min(24, $storageAccountName.Length))
-            $storageId = "/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$Env:DIAGNOSTIC_ENV_NAME/providers/Microsoft.Storage/storageAccounts/$storageAccountName"
-            $selectedFields = @(
-              'Microsoft.Storage/storageAccounts/publicNetworkAccess'
-              'Microsoft.Storage/storageAccounts/allowSharedKeyAccess'
-              'Microsoft.Storage/storageAccounts/networkAcls.defaultAction'
-              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.authenticationMethods'
-              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.versions'
-              'Microsoft.Storage/storageAccounts/fileServices/protocolSettings.smb.channelEncryption'
-            )
-            foreach ($targetId in @($storageId, "$storageId/fileServices/default")) {
-              $storagePolicyUri = "https://management.azure.com$targetId/providers/Microsoft.PolicyInsights/policyStates/default/queryResults?api-version=2019-10-01&`$from=$from&`$top=100&`$expand=PolicyEvaluationDetails"
-              try {
-                $storageStates = Invoke-RestMethod -Method Post -Uri $storagePolicyUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-              } catch [Microsoft.PowerShell.Commands.HttpResponseException] {
-                if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
-                Write-Warning 'Retained storage evaluations are unavailable (HTTP 404). No storage access setting was verified.'
-                continue
-              }
-              if (-not [string]::IsNullOrWhiteSpace($storageStates.'@odata.nextLink')) {
-                throw 'More than 100 storage policy states exist. The retained access inspection is incomplete.'
-              }
-              $reported = 0
-              foreach ($state in $storageStates.value) {
-                foreach ($expression in $state.policyEvaluationDetails.evaluatedExpressions) {
-                  if ($expression.expression -notin $selectedFields) { continue }
-                  $value = $expression.expressionValue
-                  if ($value -isnot [bool] -and
-                      $value -notin @('Enabled', 'Disabled', 'Allow', 'Deny', 'Kerberos', 'NTLMv2', 'Kerberos;NTLMv2', 'NTLMv2;Kerberos') -and
-                      $value -notmatch '^(?:[23]\.[01](?:\.1)?|AES-(?:128|256)-(?:CCM|GCM))(?:;(?:[23]\.[01](?:\.1)?|AES-(?:128|256)-(?:CCM|GCM)))*$') {
-                    Write-Warning 'An access evaluation has no supported scalar value. Raw policy values were not printed.'
-                    continue
-                  }
-                  "Retained storage field: field=$($expression.expression); value=$value; time=$($state.timestamp)." |
-                    Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-                  $reported++
-                }
-              }
-              if ($reported -eq 0) {
-                Write-Warning 'No evaluated values for the selected storage access fields were returned. Their configuration remains unverified.'
-              }
-            }
-            $storageFilter = [uri]::EscapeDataString("ResourceId eq '$storageId' and PolicyDefinitionAction eq 'modify'")
-            $storagePolicyUri = "https://management.azure.com/subscriptions/$Env:AZURE_SUBSCRIPTION_ID/providers/Microsoft.PolicyInsights/policyStates/default/queryResults?api-version=2019-10-01&`$filter=$storageFilter&`$from=$from&`$top=100"
-            $storageStates = Invoke-RestMethod -Method Post -Uri $storagePolicyUri -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-            if (-not [string]::IsNullOrWhiteSpace($storageStates.'@odata.nextLink')) {
-              throw 'More than 100 matching storage modify policy states exist. The inspection is incomplete.'
-            }
-            if (@($storageStates.value).Count -eq 0) {
-              Write-Warning 'No retained modify policy states were found for the exact storage account. This does not exclude policy enforcement.'
-            }
-            $storageDefinitions = @($storageStates.value | Select-Object -ExpandProperty policyDefinitionId -Unique)
-            foreach ($definitionId in $storageDefinitions) {
-              $definition = Invoke-RestMethod -Uri "https://management.azure.com$definitionId`?api-version=2023-04-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
-              $operations = @($definition.properties.policyRule.then.details.operations | Where-Object {
-                $_.field -eq 'Microsoft.Storage/storageAccounts/allowSharedKeyAccess'
-              })
-              foreach ($operation in $operations) {
-                if ($operation.value -isnot [bool] -or $operation.operation -notin @('add', 'addOrReplace')) {
-                  Write-Warning 'The storage key-access operation has no supported literal boolean. Assignment parameter evaluation is still required.'
-                  continue
-                }
-                "Storage policy operation: operation=$($operation.operation); field=$($operation.field); value=$($operation.value)." |
-                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-              }
-              if ($operations.Count -eq 0) {
-                'Storage modify policy has no direct allowSharedKeyAccess operation.' |
-                  Tee-Object -FilePath $Env:GITHUB_STEP_SUMMARY -Append
-              }
-            }
-          } finally {
-            Remove-Variable -Name token, headers, states, definition, storageStates -Force -ErrorAction SilentlyContinue
-          }

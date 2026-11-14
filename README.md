@@ -172,19 +172,7 @@ With networking disabled, `allTraffic` is `false` and the app has no VNet integr
 
 Obtain approval for the test subscription, region, resource limits, cost limit, and Foundry licence use before deployment. Do not use production resources. The test workflow runs Web App cases with networking enabled and disabled in series, then deletes each test deployment.
 
-For an approved Web App-only run, dispatch `continuous-testing.yml` with `WEB_APP_ONLY=true`. The optional proxy and other compute modes are skipped. The second Web App case starts only after the first case's cleanup succeeds, including when its readiness check fails. Test steps have time limits and cleanup always runs.
-
-For a separately approved startup-order investigation, set `PRIVATE_STARTUP_TEST=true`. This runs only one private Web App, without the proxy or other compute cases. It checks baseline readiness for 20 attempts. On failure, it records the mount state and replays only the exact existing mapping after all four references resolve. It checks HTTP readiness again before adding the Node mount probe. The test does not change roles, policies, storage keys, or the image. Resources are deleted after the comparison. A repaired test is not unchanged-deployment acceptance evidence.
-
-For a separately approved network/identity investigation, set `PRIVATE_ACCESS_TEST=true` instead. This requires approval for both the paid test and temporary removal of its `/data` mount. It captures routing, role, reference, endpoint, SMB, and storage settings before readiness checks. It enables bounded filesystem logging without creating a monitoring resource. After references resolve, it compares an explicit restart with a temporary mount-free control. The same container tests private DNS, TCP 445, and a signed read-only Azure Files request. FileREST success does not prove SMB authentication. The workflow restores the original mapping and app settings, preserves only safe evidence, and deletes the test group. It does not change production, roles, network rules, storage keys, or the image. A mount-free or repaired startup is not unchanged-deployment acceptance. The two private test modes cannot be combined.
-
-To read container diagnostic categories while a test is running, dispatch the same workflow with `DIAGNOSTIC_ENV_NAME` set to its exact `fvtt-asp-on-<run-id>-<attempt>` or `fvtt-asp-off-<run-id>-<attempt>` name. This mode does not deploy or delete resources. It reports reference statuses, requested and actual vault access settings, and whether the app has the expected secrets role. If vault access differs, it also checks available policy records without changing any policy. It uses the WebApp environment identity and rejects other environment names.
-
-Storage diagnostics also report private endpoint approval, shared-key access, SMB protocol settings, mount state, and whether the mapping uses the expected key reference. Storage keys and secret values are not printed.
-
-To inspect the exact vault policy operation after cleanup, also set `POLICY_DIAGNOSTICS_ONLY=true`. This mode reads retained modify policy states from the past day for that exact test vault and reports only direct public-access operations. It also checks retained evaluations of selected storage access and SMB settings. It does not deploy resources, read secrets, or change policy. Missing records or nonliteral operation values leave the cause unconfirmed and fail explicitly. Unavailable storage evaluations produce an explicit warning, not a claim that access is correct. This option cannot be combined with mount capture.
-
-For an approved test, also set `CAPTURE_MOUNT_EVIDENCE=true` to add a test-only Node preload that reports the application's `/data` mount entry. This option requires an existing diagnostic environment name; invalid input fails before Azure access or deployment. Capture changes test app settings, restarts that app, refreshes its Key Vault references, and reapplies the same mount mapping only after the storage key reference resolves within a bounded wait. It does not change the image. The workflow saves only mount evidence, not raw container logs. A test that passes only after this diagnostic change does not prove that the unchanged deployment starts correctly.
+Test steps have time limits. Cleanup runs after successful and failed checks.
 
 The automated checks verify routing, VNet integration, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
 
@@ -215,18 +203,6 @@ bicep build .\infra\main.bicep
 Import-Module Pester -MinimumVersion 5.0
 Invoke-Pester -Path .\tests\Test-WebAppInfrastructure.Tests.ps1 -Output Detailed
 ```
-
-### Bounded production recovery
-
-Use `infra\recovery.bicep` and `scripts\Invoke-ProductionWebAppRecovery.ps1` only after separate production approval. This path creates compute against existing data services. It does not redeploy storage, Key Vault, or secrets. Normal Foundry startup can write production files; this is not read-only verification.
-
-The approved JSON manifest specifies the exact subscription, resource group, repository, environment, storage account, vault, unique recovery ID, and resource limits. The current runner permits New Zealand North, one P0v3 instance, the proxy on that plan, a NZ$5 operating limit, 90-minute compute cleanup, and one share snapshot retained for at most 24 hours. These are operating limits, not cloud-enforced spending or retention guarantees.
-
-With an existing Azure CLI login, run `Preflight` and then `Snapshot`. Preflight rejects existing compute, conflicting production operations, and changes to data services. It accepts [what-if `Ignore` records](https://learn.microsoft.com/azure/azure-resource-manager/bicep/deploy-what-if#change-types) for existing resources but rejects their redeployment, including `NoChange`. Register and read back the approved one-time snapshot cleanup before `Run`. Pass that registration ID with `-CleanupAutomationId`. Keep the cleanup host and Copilot available.
-
-The runner creates apps disabled, verifies routing and the new app's secrets role before startup, captures safe SMB and application-container evidence, and always removes only attempt-owned compute. A valid mapping or successful FileREST request does not prove a CIFS mount. `CleanupSnapshot` requires the exact snapshot timestamp and preserves the live share and other snapshots. Do not use full `azd provision` or `azd down` for recovery.
-
-For the protected workflow path, dispatch `continuous-testing.yml` with `PRODUCTION_RECOVERY=true` and `RECOVERY_MANIFEST_BASE64` containing the approved manifest, verified snapshot, and cleanup registration. Other paid compute modes are skipped. The manifest must match the Production environment variables and subscription. Do not include credentials or secret values.
 
 ---
 
