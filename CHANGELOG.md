@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Isolated Web App CI cases now require live application-container CIFS mount evidence at `/data` and retain a secret-safe JSON artifact before cleanup. Terminal access does not require an SSH server or a changed container image.
 - Added Azure Container Apps as a third compute service option (`Container App`), supporting scale-to-zero, VNet integration, Key Vault secret references via managed identity, Azure Files storage, diagnostics, and optional DDB-Proxy deployment. Closes #37.
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
 - Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.

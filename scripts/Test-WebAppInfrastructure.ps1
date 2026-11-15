@@ -32,6 +32,10 @@
 .PARAMETER MountInfoPath
     A local file containing /proc/self/mountinfo from the application container.
 
+.PARAMETER CaptureRuntimeMount
+    Read /proc/self/mountinfo through the authenticated application-container
+    terminal. Fail if live CIFS mount evidence cannot be obtained.
+
 .PARAMETER RetryCount
     Maximum number of reference and readiness checks.
 
@@ -78,6 +82,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$MountInfoPath,
 
+    [switch]$CaptureRuntimeMount,
+
     [ValidateRange(1, 60)] # At most 60 polling attempts.
     [int]$RetryCount = 60,
 
@@ -93,6 +99,88 @@ $appUri = "https://management.azure.com$appResourceId"
 $storageAccountUri = "https://management.azure.com/subscriptions/$([uri]::EscapeDataString($SubscriptionId))/resourceGroups/$([uri]::EscapeDataString($ResourceGroupName))/providers/Microsoft.Storage/storageAccounts/$StorageAccountName"
 $apiVersion = '2025-03-01'
 $referenceNames = @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')
+
+function Get-ApplicationMountEvidence {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScmHostName,
+
+        [Parameter(Mandatory)]
+        [string]$AccessToken,
+
+        [Parameter(Mandatory)]
+        [string]$ExpectedStorageAccount
+    )
+
+    $nonce = [guid]::NewGuid().ToString('N')
+    $remoteScript = @"
+const fs = require('node:fs');
+const lines = fs.readFileSync('/proc/self/mountinfo', 'utf8').trim().split('\n');
+const mounts = lines.map(line => {
+  const fields = line.split(' ');
+  const separator = fields.indexOf('-');
+  return { mountPoint: fields[4], fileSystem: fields[separator + 1], source: fields[separator + 2] };
+}).filter(mount => mount.mountPoint === '/data');
+process.stdout.write('FVTT_MOUNT_$nonce ' + JSON.stringify({ mounts }) + '\n');
+"@
+    $encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
+    $command = "stty -echo; printf '\n'; node -e `"eval(Buffer.from('$encodedScript','base64').toString('utf8'))`"; exit`n"
+    $socket = New-Object System.Net.WebSockets.ClientWebSocket
+    $timeout = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(60))
+    try {
+        $socket.Options.SetRequestHeader('Authorization', "Bearer $AccessToken")
+        # With no target override, App Service connects to the main application container.
+        [void]$socket.ConnectAsync([uri]"wss://$ScmHostName/exec/shell?shell=/bin/sh", $timeout.Token).GetAwaiter().GetResult()
+        $commandBytes = [Text.Encoding]::UTF8.GetBytes($command)
+        [void]$socket.SendAsync([ArraySegment[byte]]::new($commandBytes), [Net.WebSockets.WebSocketMessageType]::Binary, $true, $timeout.Token).GetAwaiter().GetResult()
+        $buffer = [byte[]]::new(4096)
+        $decoder = [Text.Encoding]::UTF8.GetDecoder()
+        $characters = [char[]]::new(4096)
+        $output = [Text.StringBuilder]::new()
+        while ($socket.State -eq [Net.WebSockets.WebSocketState]::Open) {
+            $frame = $socket.ReceiveAsync([ArraySegment[byte]]::new($buffer), $timeout.Token).GetAwaiter().GetResult()
+            if ($frame.MessageType -eq [Net.WebSockets.WebSocketMessageType]::Close) {
+                break
+            }
+            $characterCount = $decoder.GetChars($buffer, 0, $frame.Count, $characters, 0)
+            [void]$output.Append($characters, 0, $characterCount)
+            if ($output.Length -gt 65536) {
+                throw 'Application-container mount capture exceeded its output limit. Raw terminal output is not printed.'
+            }
+            $record = [regex]::Match($output.ToString(), "(?m)^FVTT_MOUNT_$nonce (?<data>\{[^\r\n]+\})\r?$")
+            if ($record.Success) {
+                $evidence = $record.Groups['data'].Value | ConvertFrom-Json
+                $sourcePattern = '^//{0}\.file\.[^/\s]+/foundryvttdata$' -f [regex]::Escape($ExpectedStorageAccount)
+                $matchingMounts = @($evidence.mounts | Where-Object {
+                    $_.mountPoint -ceq '/data' -and $_.fileSystem -ceq 'cifs' -and $_.source -cmatch $sourcePattern
+                })
+                if ($matchingMounts.Count -ne 1 -or @($evidence.mounts).Count -ne 1) {
+                    throw 'The live application-container mountinfo does not show the expected Azure Files CIFS mount at /data.'
+                }
+                return [pscustomobject]@{
+                    MountPoint = '/data'
+                    FileSystem = 'cifs'
+                    Source = $matchingMounts[0].source
+                    CapturedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
+                    CaptureMethod = 'AppServiceApplicationTerminal'
+                }
+            }
+        }
+        throw 'The application-container terminal closed without current mount evidence. Runtime /data verification is blocked.'
+    } catch [OperationCanceledException] {
+        throw 'Application-container mount capture timed out. Runtime /data verification is blocked.'
+    } catch [Net.WebSockets.WebSocketException] {
+        throw 'Cannot access the application-container terminal. Check SCM network access and existing permissions. Runtime /data verification is blocked.'
+    } finally {
+        $socket.Dispose()
+        $timeout.Dispose()
+        Remove-Variable -Name AccessToken, output -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($CaptureRuntimeMount -and $MountInfoPath) {
+    throw 'Choose live application-container capture or a supplied mountinfo file, not both.'
+}
 
 try {
     $token = & azd auth token --tenant-id $TenantId --scope 'https://management.azure.com/.default' --no-prompt
@@ -186,6 +274,18 @@ try {
     if (-not $ready) {
         throw "The test Web App did not resolve all four Key Vault references and serve Foundry within $RetryCount attempts. Last readiness result: $readinessStatus Unresolved or unchecked references: $($unresolved -join ', ')."
     }
+    $runtimeMountEvidence = $null
+    if ($CaptureRuntimeMount) {
+        $expectedScmHostName = $app.properties.defaultHostName -creplace '^([^.]+)\.', '$1.scm.'
+        $scmHostName = @($app.properties.enabledHostNames | Where-Object {
+            $_ -ceq $expectedScmHostName
+        })
+        if ($scmHostName.Count -ne 1) {
+            throw 'Cannot identify the expected SCM hostname from the test Web App response.'
+        }
+        $runtimeMountEvidence = Get-ApplicationMountEvidence -ScmHostName $scmHostName[0] -AccessToken $token -ExpectedStorageAccount $StorageAccountName
+        $runtimeMountVerified = $true
+    }
     if (-not $runtimeMountVerified) {
         Write-Warning 'Runtime /data mount verification is BLOCKED: supply mountinfo from the application container. Routing, configuration, and HTTP readiness do not prove the mount.'
     }
@@ -195,6 +295,7 @@ try {
         StorageConfigurationVerified = $true
         FoundryHttpReady = $true
         RuntimeMountVerified = $runtimeMountVerified
+        RuntimeMountEvidence = $runtimeMountEvidence
     }
 } finally {
     Remove-Variable -Name token, headers, storage, mount, reference -Force -ErrorAction SilentlyContinue

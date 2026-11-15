@@ -10,6 +10,76 @@ BeforeAll {
     function azd {
         throw 'The azd command must be mocked during these unit tests.'
     }
+
+    function Get-TestWebSocket {
+        $state = @{
+            Mounts = @(@{ mountPoint = '/data'; fileSystem = 'cifs'; source = '//fvtttest.file.core.windows.net/foundryvttdata' })
+            FragmentSize = 17
+            Offset = 0
+            Disposed = $false
+            CloseWithoutRecord = $false
+            FailConnect = $false
+            CancelConnect = $false
+        }
+        $options = [pscustomobject]@{}
+        $options | Add-Member ScriptMethod SetRequestHeader {
+            param($Name, $Value)
+            if ($Name -ne 'Authorization' -or $Value -notlike 'Bearer *') {
+                throw 'Expected bearer authentication.'
+            }
+        }
+        $socket = [pscustomobject]@{
+            Options = $options
+            State = [Net.WebSockets.WebSocketState]::Open
+            TestState = $state
+        }
+        $socket | Add-Member ScriptMethod ConnectAsync {
+            param($Uri, $CancellationToken)
+            $CancellationToken.ThrowIfCancellationRequested()
+            $completion = [Threading.Tasks.TaskCompletionSource[bool]]::new()
+            if ($this.TestState.FailConnect) {
+                $completion.SetException([Net.WebSockets.WebSocketException]::new('private-transport-error'))
+            } elseif ($this.TestState.CancelConnect) {
+                $completion.SetCanceled()
+            } else {
+                $completion.SetResult($true)
+            }
+            $this.TestState.Uri = $Uri
+            return $completion.Task
+        }
+        $socket | Add-Member ScriptMethod SendAsync {
+            param($Buffer, $MessageType, $EndOfMessage, $CancellationToken)
+            $CancellationToken.ThrowIfCancellationRequested()
+            if ($MessageType -ne [Net.WebSockets.WebSocketMessageType]::Binary -or -not $EndOfMessage) {
+                throw 'Expected a complete binary terminal command.'
+            }
+            $command = [Text.Encoding]::UTF8.GetString($Buffer.Array, $Buffer.Offset, $Buffer.Count)
+            $encodedScript = [regex]::Match($command, "Buffer\.from\('(?<script>[A-Za-z0-9+/=]+)'").Groups['script'].Value
+            $this.TestState.RemoteScript = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encodedScript))
+            $marker = [regex]::Match($this.TestState.RemoteScript, 'FVTT_MOUNT_[a-f0-9]{32}').Value
+            $data = @{ mounts = @($this.TestState.Mounts) } | ConvertTo-Json -Compress -Depth 4
+            $this.TestState.Bytes = [Text.Encoding]::UTF8.GetBytes("$command`r`n$marker $data`r`n")
+            return [Threading.Tasks.Task]::CompletedTask
+        }
+        $socket | Add-Member ScriptMethod ReceiveAsync {
+            param($Buffer, $CancellationToken)
+            $CancellationToken.ThrowIfCancellationRequested()
+            $remaining = $this.TestState.Bytes.Length - $this.TestState.Offset
+            if ($this.TestState.CloseWithoutRecord -or $remaining -eq 0) {
+                $result = [Net.WebSockets.WebSocketReceiveResult]::new(0, [Net.WebSockets.WebSocketMessageType]::Close, $true)
+            } else {
+                $count = [Math]::Min($this.TestState.FragmentSize, $remaining)
+                [Array]::Copy($this.TestState.Bytes, $this.TestState.Offset, $Buffer.Array, $Buffer.Offset, $count)
+                $this.TestState.Offset += $count
+                $result = [Net.WebSockets.WebSocketReceiveResult]::new($count, [Net.WebSockets.WebSocketMessageType]::Binary, $false)
+            }
+            $completion = [Threading.Tasks.TaskCompletionSource[Net.WebSockets.WebSocketReceiveResult]]::new()
+            $completion.SetResult($result)
+            return $completion.Task
+        }
+        $socket | Add-Member ScriptMethod Dispose { $this.TestState.Disposed = $true }
+        return $socket
+    }
 }
 
 AfterAll {
@@ -64,6 +134,7 @@ Describe 'Test Web App checks' {
             outboundVnetRouting = @{ allTraffic = $true }
             virtualNetworkSubnetId = '/subscriptions/test-subscription/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/test/subnets/webApp'
             defaultHostName = 'fvtt-test.azurewebsites.net'
+            enabledHostNames = @('fvtt-test.azurewebsites.net', 'fvtt-test.scm.azurewebsites.net')
         }
         $mountProperties = @{
             accountName = 'fvtttest'
@@ -298,6 +369,78 @@ Describe 'Test Web App checks' {
         Mock azd { $global:LASTEXITCODE = 1 }
         { & $checkScript @checkParameters } | Should -Throw '*Cannot obtain*'
         Should -Invoke Invoke-RestMethod -Times 0 -Exactly
+    }
+
+    It 'captures current application mount evidence across fragmented terminal frames without mount options' {
+        $socket = Get-TestWebSocket
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        $result = & $checkScript @checkParameters
+        $result.RuntimeMountVerified | Should -BeTrue
+        $result.RuntimeMountEvidence.Source | Should -Be '//fvtttest.file.core.windows.net/foundryvttdata'
+        $result.RuntimeMountEvidence.CaptureMethod | Should -Be 'AppServiceApplicationTerminal'
+        $socket.TestState.Uri.AbsoluteUri | Should -Be 'wss://fvtt-test.scm.azurewebsites.net/exec/shell?shell=/bin/sh'
+        $socket.TestState.Disposed | Should -BeTrue
+        Should -Invoke Write-Warning -Times 0 -Exactly
+
+        $fixture = Join-Path $TestDrive 'application-mountinfo'
+        '102 99 0:73 / /data rw,private-option - cifs //fvtttest.file.core.windows.net/foundryvttdata rw,private-option' |
+            Set-Content -LiteralPath $fixture
+        $fixtureScript = $socket.TestState.RemoteScript.Replace("fs.readFileSync('/proc/self/mountinfo', 'utf8')", "fs.readFileSync(process.argv[1], 'utf8')")
+        $actualRecord = & node -e $fixtureScript $fixture
+        $LASTEXITCODE | Should -Be 0
+        $actualRecord | Should -Match '^FVTT_MOUNT_[a-f0-9]{32} '
+        $actualRecord | Should -Not -Match 'private-option'
+        $actualMount = ($actualRecord -replace '^FVTT_MOUNT_[a-f0-9]{32} ', '') | ConvertFrom-Json
+        $actualMount.mounts[0].source | Should -Be '//fvtttest.file.core.windows.net/foundryvttdata'
+    }
+
+    It 'rejects live evidence for <FileSystem> on <Source>' -TestCases @(
+        @{ FileSystem = 'ext4'; Source = '/dev/sda1' }
+        @{ FileSystem = 'cifs'; Source = '//anotheraccount.file.core.windows.net/foundryvttdata' }
+    ) {
+        param($FileSystem, $Source)
+        $socket = Get-TestWebSocket
+        $socket.TestState.Mounts[0].fileSystem = $FileSystem
+        $socket.TestState.Mounts[0].source = $Source
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        { & $checkScript @checkParameters } | Should -Throw '*live application-container mountinfo does not show*'
+        $socket.TestState.Disposed | Should -BeTrue
+    }
+
+    It 'does not accept a terminal connection without a fresh mount record' {
+        $socket = Get-TestWebSocket
+        $socket.TestState.CloseWithoutRecord = $true
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        { & $checkScript @checkParameters } | Should -Throw '*closed without current mount evidence*'
+        $socket.TestState.Disposed | Should -BeTrue
+    }
+
+    It 'reports denied terminal access without printing raw transport details' {
+        $socket = Get-TestWebSocket
+        $socket.TestState.FailConnect = $true
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        $failure = { & $checkScript @checkParameters } | Should -Throw '*Cannot access the application-container terminal*' -PassThru
+        $failure.Exception.Message | Should -Not -Match 'private-transport-error'
+        $socket.TestState.Disposed | Should -BeTrue
+    }
+
+    It 'does not send credentials to an unexpected SCM hostname' {
+        $appProperties.enabledHostNames = @('unexpected.example.com')
+        $checkParameters.CaptureRuntimeMount = $true
+        { & $checkScript @checkParameters } | Should -Throw '*Cannot identify the expected SCM hostname*'
+    }
+
+    It 'fails explicitly when the terminal capture deadline expires' {
+        $socket = Get-TestWebSocket
+        $socket.TestState.CancelConnect = $true
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        { & $checkScript @checkParameters } | Should -Throw '*mount capture timed out*'
+        $socket.TestState.Disposed | Should -BeTrue
     }
 }
 

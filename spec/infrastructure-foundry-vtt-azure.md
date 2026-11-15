@@ -135,6 +135,7 @@ azd env set AZURE_DEPLOY_NETWORKING "false"
 1. Container App scales to zero replicas when idle (`containerAppMinReplicas == 0`).
 1. For an isolated Web App test, verify both networking-enabled and networking-disabled deployments. Confirm effective `outboundVnetRouting.allTraffic`, VNet integration, and all four resolved Key Vault references.
 1. Confirm the application container mounts the expected Azure Files SMB share at `/data` and Foundry starts successfully. An HTTP 200 response or a configured storage mount alone is not sufficient evidence. If application-container mount evidence is unavailable, runtime verification remains blocked.
+1. Isolated CI Web App cases must capture current application-container `/proc/self/mountinfo` through the authenticated App Service terminal. Require exactly one `/data` CIFS mount for the expected account/share. Bound capture time and output size. Retain only the mount point, file system, share source, capture time, and method; do not retain raw terminal output, mount options, or secrets. Missing access or evidence must fail the case without preventing cleanup. Do not change the image, enable public SCM access, or broaden permissions to force capture.
 1. Obtain separate approval for paid test resources and cost limits before deployment. Do not modify production without separate approval. Delete isolated test resources after each case, including after failure.
 
 ## 8. Related Specifications / Further Reading
