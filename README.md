@@ -174,7 +174,9 @@ Obtain approval for the test subscription, region, resource limits, cost limit, 
 
 Test steps have time limits. Cleanup runs after successful and failed checks.
 
-The automated checks verify routing, VNet integration, effective Shared Key access, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks do **not** prove that the running application container mounted `/data`. The workflow summary reports runtime mount verification as blocked until that evidence is available.
+The automated checks verify routing, VNet integration, effective Shared Key access, all four Key Vault reference statuses, the Azure Files configuration, and a Foundry HTTP response. These checks alone do **not** prove that the running application container mounted `/data`.
+
+Isolated Web App cases also require live mount capture after Foundry becomes ready. The checker uses the authenticated App Service application-container terminal to read `/proc/self/mountinfo`, without changing the container image or enabling an SSH server. It requires exactly one `/data` mount that uses `cifs` and the expected account/share. A fresh per-session marker separates command output from terminal echo. Capture has a 60-second deadline and an output limit. The saved JSON artifact contains only the mount point, file system, share source, capture time, and capture method; raw terminal output, mount options, and environment values are not saved. Missing access, missing evidence, or an incorrect mount fails the isolated case before unconditional cleanup.
 
 The current Azure Files mount uses a storage account key. The checker reads the deployed storage account and stops before readiness polling if `allowSharedKeyAccess=false`, even when the template requests `true`. A `null` value permits Shared Key access under the [documented Azure default](https://learn.microsoft.com/azure/storage/common/shared-key-authorization-prevent). The deployment identity needs `Microsoft.Storage/storageAccounts/read` for this check; no storage key is read. An inherited Azure Policy can modify the requested setting. Review effective policy and configuration with the environment owner, or use an approved compatible test environment. Do not use policy exclusions without policy-owner approval, enable public storage access as a workaround, or change a working production deployment to repair a test. This compatibility failure does not prove the exact container startup error.
 
@@ -184,9 +186,9 @@ The template's optional `AZURE_RESOURCE_GROUP_TAGS` value maps to `resourceGroup
 
 On failure, the checker reports unresolved reference names and statuses, failed management or HTTP requests, non-200 HTTP status codes, or HTTP 200 responses that do not identify Foundry. Reference-status transport failures retry within the existing readiness limit and are not reported as confirmed reference failures. It does not print HTTP response bodies. Use the reported reason to investigate startup before changing routing or retry limits.
 
-Use an authenticated diagnostic session in the **application container**, not the SCM container, to capture `/proc/self/mountinfo`. The `/data` entry must use `cifs` and the expected storage account's `foundryvttdata` share. If the image or diagnostic tools do not permit this check, keep runtime verification blocked. Do not enable public SCM or storage access to obtain evidence.
+Use `-CaptureRuntimeMount` to request live evidence with the existing `azd` login. This requires Node.js and `/bin/sh` in the application image, SCM network access, and existing Kudu permissions. App Service uses SCM as the authenticated proxy, but runs the command in the **application container**, not the SCM container. See [App Service container shell access](https://learn.microsoft.com/azure/app-service/configure-linux-open-ssh-session?pivots=container-linux). If access or tools are unavailable, keep verification blocked. Do not enable public SCM or storage access to obtain evidence.
 
-Save the captured text locally, then run the read-only check with the existing `azd` login:
+For a manually captured file, use `/proc/self/mountinfo` from an authenticated session in the application container:
 
 ```powershell
 .\scripts\Test-WebAppInfrastructure.ps1 `
@@ -199,7 +201,7 @@ Save the captured text locally, then run the read-only check with the existing `
   -MountInfoPath '.\test-mountinfo.txt'
 ```
 
-Use `-Networking Disabled` for the case without networking. Without `-MountInfoPath`, the script reports `RuntimeMountVerified=false`. Record successful Foundry startup and private endpoint/DNS checks before accepting the fix. Delete only the isolated test resources with `azd down --no-prompt --purge --force`, including after a failed check.
+Use `-Networking Disabled` for the case without networking. Use either `-CaptureRuntimeMount` or `-MountInfoPath`, not both. Without either option, the script reports `RuntimeMountVerified=false`. Record successful Foundry startup and private endpoint/DNS checks before accepting the fix. Delete only the isolated test resources with `azd down --no-prompt --purge --force`, including after a failed check.
 
 Local regression checks require PowerShell 7 and Pester 5 or later:
 

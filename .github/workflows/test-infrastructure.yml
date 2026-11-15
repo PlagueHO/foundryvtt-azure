@@ -176,13 +176,28 @@ jobs:
             -ResourceGroupName $resourceGroupName `
             -WebAppName $Env:AZURE_ENV_NAME `
             -StorageAccountName $storageAccountName `
-            -Networking $networking
+            -Networking $networking `
+            -CaptureRuntimeMount:('${{ inputs.ISOLATED_WEBAPP_TEST }}' -eq 'true')
           "Web App routing, Key Vault references, storage configuration, and Foundry HTTP readiness: passed." |
             Add-Content -Path $Env:GITHUB_STEP_SUMMARY
-          if (-not $result.RuntimeMountVerified) {
+          if ($result.RuntimeMountEvidence) {
+            $result.RuntimeMountEvidence | ConvertTo-Json |
+              Set-Content -LiteralPath (Join-Path $Env:RUNNER_TEMP 'webapp-mount-evidence.json')
+            "Runtime /data CIFS mount: verified in the application container." |
+              Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+          } elseif (-not $result.RuntimeMountVerified) {
             "Runtime /data mount verification: BLOCKED. Application-container mountinfo evidence is still required before accepting the fix." |
               Add-Content -Path $Env:GITHUB_STEP_SUMMARY
           }
+
+      - name: Save application-container mount evidence
+        if: inputs.ISOLATED_WEBAPP_TEST
+        uses: actions/upload-artifact@v7
+        with:
+          name: mount-evidence-${{ env.AZURE_ENV_NAME }}
+          path: ${{ runner.temp }}/webapp-mount-evidence.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Delete Infrastructure
         if: always() && (!inputs.ISOLATED_WEBAPP_TEST || steps.isolated_scope.outcome == 'success')
