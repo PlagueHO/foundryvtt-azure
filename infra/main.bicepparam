@@ -4,6 +4,7 @@ using './main.bicep'
 param environmentName = readEnvironmentVariable('AZURE_ENV_NAME', 'azdtemp')
 param location = readEnvironmentVariable('AZURE_LOCATION', 'EastUS2')
 param resourceGroupName = readEnvironmentVariable('AZURE_RESOURCE_GROUP_NAME', 'rg-${environmentName}')
+param resourceGroupTags = json(readEnvironmentVariable('AZURE_RESOURCE_GROUP_TAGS', '{}'))
 
 // User or service principal deploying the resources
 param principalId = readEnvironmentVariable('AZURE_PRINCIPAL_ID', '')
