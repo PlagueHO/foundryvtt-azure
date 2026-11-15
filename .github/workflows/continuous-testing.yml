@@ -9,6 +9,21 @@ on:
     paths:
       - infra/**
   workflow_dispatch:
+    inputs:
+      WEBAPP_ONLY:
+        description: "Run only the two isolated Web App cases, without optional compute or diagnostics."
+        required: false
+        type: boolean
+        default: false
+      TEST_RESOURCE_GROUP_TAGS:
+        description: "JSON object of tags for the two Web App test groups only. Policy-related tags require policy-owner approval."
+        required: false
+        type: string
+        default: '{}'
+      TEST_AZURE_LOCATION:
+        description: "Override the region for the two Web App tests. Otherwise use the WebApp environment variable."
+        required: false
+        type: string
   
 permissions:
   id-token: write
@@ -28,6 +43,9 @@ jobs:
       - lint-and-publish-bicep
     with:
       ENVIRONMENT: WebApp
+      AZURE_LOCATION: ${{ inputs.TEST_AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS || '{}' }}
+      ISOLATED_WEBAPP_TEST: ${{ inputs.WEBAPP_ONLY || false }}
       AZURE_ENV_NAME: ${{ format('fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
@@ -48,6 +66,9 @@ jobs:
       - test-webapp
     with:
       ENVIRONMENT: WebApp
+      AZURE_LOCATION: ${{ inputs.TEST_AZURE_LOCATION }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS || '{}' }}
+      ISOLATED_WEBAPP_TEST: ${{ inputs.WEBAPP_ONLY || false }}
       AZURE_ENV_NAME: ${{ format('fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_APP_SERVICE_PLAN_SKUNAME: 'P0v3'
@@ -64,6 +85,7 @@ jobs:
   # Only run test-infrastructure in series because only one Foundry environment can be deployed at a time
   test-container-app:
     name: Test Container App Deployment
+    if: ${{ !inputs.WEBAPP_ONLY }}
     uses: ./.github/workflows/test-infrastructure.yml
     needs:
       - test-webapp-without-networking

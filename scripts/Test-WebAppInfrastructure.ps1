@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Uses the existing azd login for read-only Azure Resource Manager checks.
-    Checks the Azure Files configuration and the Foundry HTTP response.
+    Checks effective Shared Key access, the Azure Files configuration, and the Foundry HTTP response.
     Reports readiness failure reasons without printing HTTP response bodies.
     An optional mountinfo file must come from the running application container,
     not the SCM container. Without this evidence, runtime mount verification
@@ -90,6 +90,7 @@ $ProgressPreference = 'SilentlyContinue'
 $expectedRouting = $Networking -eq 'Enabled'
 $appResourceId = "/subscriptions/$([uri]::EscapeDataString($SubscriptionId))/resourceGroups/$([uri]::EscapeDataString($ResourceGroupName))/providers/Microsoft.Web/sites/$([uri]::EscapeDataString($WebAppName))"
 $appUri = "https://management.azure.com$appResourceId"
+$storageAccountUri = "https://management.azure.com/subscriptions/$([uri]::EscapeDataString($SubscriptionId))/resourceGroups/$([uri]::EscapeDataString($ResourceGroupName))/providers/Microsoft.Storage/storageAccounts/$StorageAccountName"
 $apiVersion = '2025-03-01'
 $referenceNames = @('FOUNDRY_USERNAME', 'FOUNDRY_PASSWORD', 'FOUNDRY_ADMIN_KEY', 'STORAGE_ACCOUNT_KEY')
 
@@ -110,6 +111,14 @@ try {
     }
     if ([string]::IsNullOrWhiteSpace($app.properties.defaultHostName)) {
         throw 'The Web App response has no default hostname.'
+    }
+
+    $storageAccount = Invoke-RestMethod -Uri "$storageAccountUri`?api-version=2024-01-01" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+    if ($null -eq $storageAccount.properties) {
+        throw 'Cannot check Shared Key access: the test storage account response has no properties.'
+    }
+    if ($storageAccount.properties.allowSharedKeyAccess -eq $false) {
+        throw 'The test storage account has allowSharedKeyAccess=false. This deployment uses an account key for the Azure Files mount. Review effective Azure Policy and storage configuration with the environment owner, or use an approved compatible test environment. Do not bypass policy or change production. Foundry readiness and the runtime /data mount remain unverified.'
     }
 
     $storage = Invoke-RestMethod -Method Post -Uri "$appUri/config/azurestorageaccounts/list?api-version=$apiVersion" -Headers $headers -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5

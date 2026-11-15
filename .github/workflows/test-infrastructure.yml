@@ -19,6 +19,16 @@ on:
         description: "The name of the Azure resource group to deploy the application resources to"
         required: false
         type: string
+      AZURE_RESOURCE_GROUP_TAGS:
+        description: "JSON object of tags for this test group only. Policy-related tags require policy-owner approval."
+        required: false
+        type: string
+        default: '{}'
+      ISOLATED_WEBAPP_TEST:
+        description: "Disable optional services and storage locks for an approved isolated Web App test, and verify group deletion."
+        required: false
+        type: boolean
+        default: false
       AZURE_APP_SERVICE_PLAN_SKUNAME:
         description: "The App Service Plan SKU name to use for the Web App compute service"
         required: false
@@ -72,6 +82,7 @@ jobs:
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION || vars.AZURE_LOCATION }}
       AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.AZURE_RESOURCE_GROUP_TAGS }}
 
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
@@ -84,14 +95,16 @@ jobs:
       # Environment variables for azd
       AZURE_APP_SERVICE_PLAN_SKUNAME: ${{ inputs.AZURE_APP_SERVICE_PLAN_SKUNAME }}
       AZURE_COMPUTE_SERVICE: ${{ inputs.AZURE_COMPUTE_SERVICE || vars.AZURE_COMPUTE_SERVICE }}
-      AZURE_DEPLOY_DDB_PROXY: ${{ vars.AZURE_DEPLOY_DDB_PROXY }}
-      AZURE_DEPLOY_DIAGNOSTICS: ${{ vars.AZURE_DEPLOY_DIAGNOSTICS }}
+      AZURE_DEPLOY_DDB_PROXY: ${{ inputs.ISOLATED_WEBAPP_TEST && 'false' || vars.AZURE_DEPLOY_DDB_PROXY }}
+      AZURE_BASTION_HOST_DEPLOY: 'false'
+      AZURE_DEPLOY_DIAGNOSTICS: ${{ inputs.ISOLATED_WEBAPP_TEST && 'false' || vars.AZURE_DEPLOY_DIAGNOSTICS }}
       AZURE_DEPLOY_NETWORKING: ${{ inputs.AZURE_DEPLOY_NETWORKING || vars.AZURE_DEPLOY_NETWORKING }}
-      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
+      AZURE_STORAGE_RESOURCE_LOCK_ENABLED: ${{ inputs.ISOLATED_WEBAPP_TEST && 'false' || vars.AZURE_STORAGE_RESOURCE_LOCK_ENABLED }}
+      AZURE_STORAGE_CONFIGURATION: 'Premium_100GB'
       AZURE_CONTAINER_INSTANCE_CPU: ${{ vars.AZURE_CONTAINER_INSTANCE_CPU || '2' }}
       AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB: ${{ vars.AZURE_CONTAINER_INSTANCE_MEMORY_IN_GB }}
       AZURE_CONTAINER_APP_MIN_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MIN_REPLICAS || '0' }}
-      AZURE_STORAGE_PUBLIC_ACCESS: ${{ vars.AZURE_STORAGE_PUBLIC_ACCESS }}
+      AZURE_STORAGE_PUBLIC_ACCESS: ${{ inputs.ISOLATED_WEBAPP_TEST && 'false' || vars.AZURE_STORAGE_PUBLIC_ACCESS }}
 
     environment: ${{ inputs.ENVIRONMENT }}
     runs-on: ubuntu-latest
@@ -99,6 +112,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Validate isolated Web App scope
+        id: isolated_scope
+        if: inputs.ISOLATED_WEBAPP_TEST
+        shell: pwsh
+        run: |
+          $expectedSuffix = "-$Env:GITHUB_RUN_ID-$Env:GITHUB_RUN_ATTEMPT"
+          $allowedNames = @("fvtt-asp-on$expectedSuffix", "fvtt-asp-off$expectedSuffix")
+          if ($Env:AZURE_COMPUTE_SERVICE -ne 'Web App' -or
+              $Env:AZURE_ENV_NAME -cnotin $allowedNames -or
+              $Env:AZURE_RESOURCE_GROUP_NAME -cne "rg-$Env:AZURE_ENV_NAME") {
+            throw 'Isolated Web App tests require the unique Web App and resource group names for this workflow run.'
+          }
 
       - name: Install azd
         uses: Azure/setup-azd@v2.4.0
@@ -159,6 +185,32 @@ jobs:
           }
 
       - name: Delete Infrastructure
-        if: always()
+        if: always() && (!inputs.ISOLATED_WEBAPP_TEST || steps.isolated_scope.outcome == 'success')
         timeout-minutes: 15
         run: azd down --no-prompt --purge --force
+
+      - name: Verify isolated test group deletion
+        if: always() && inputs.ISOLATED_WEBAPP_TEST && steps.isolated_scope.outcome == 'success'
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($Env:AZURE_RESOURCE_GROUP_NAME)) {
+            throw 'Cannot verify deletion without the exact isolated test group name.'
+          }
+          try {
+            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
+              throw 'Cannot obtain a token to verify isolated test group deletion.'
+            }
+            $headers = @{ Authorization = "Bearer $token" }
+            $groupUri = "https://management.azure.com/subscriptions/$([uri]::EscapeDataString($Env:AZURE_SUBSCRIPTION_ID))/resourceGroups/$([uri]::EscapeDataString($Env:AZURE_RESOURCE_GROUP_NAME))?api-version=2024-03-01"
+            $response = Invoke-WebRequest -Uri $groupUri -Headers $headers -SkipHttpErrorCheck -TimeoutSec 30
+            if ($response.StatusCode -ne 404) {
+              throw "Isolated test group deletion is not verified. ARM returned HTTP $([int]$response.StatusCode)."
+            }
+            "Isolated test group deletion: verified (HTTP 404)." |
+              Add-Content -Path $Env:GITHUB_STEP_SUMMARY
+          } finally {
+            Remove-Variable -Name token, headers, response -Force -ErrorAction SilentlyContinue
+          }

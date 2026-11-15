@@ -34,6 +34,9 @@ param principalIdType string = 'User'
 })
 param resourceGroupName string = 'rg-${environmentName}'
 
+@sys.description('Additional resource group tags. The required azd-env-name tag is preserved. Use policy-related tags only with policy-owner approval.')
+param resourceGroupTags object = {}
+
 // Configuration for the Foundry VTT server - Required
 @sys.description('Your Foundry VTT username.')
 @secure()
@@ -187,7 +190,7 @@ var effectiveDeployNetworking = deployNetworking && (computeService == 'Web App'
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: !empty(resourceGroupName) ? resourceGroupName : 'rg-${environmentName}'
   location: location
-  tags: tags
+  tags: union(resourceGroupTags, tags)
 }
 
 // ------------- LOG ANALYTICS WORKSPACE (OPTIONAL) -------------

@@ -37,6 +37,14 @@ Describe 'Compiled Foundry Web App routing' {
         $template.resources.keyVault.properties.parameters.networkAcls.value.defaultAction |
             Should -Be "[if(variables('effectiveDeployNetworking'), 'Deny', 'Allow')]"
     }
+
+    It 'keeps extra tags opt-in and scoped to the group while preserving required tags' {
+        @($template.parameters.resourceGroupTags.defaultValue.PSObject.Properties).Count | Should -Be 0
+        $template.resources.rg.tags | Should -Be "[union(parameters('resourceGroupTags'), variables('tags'))]"
+        $template.resources.storageAccount.properties.parameters.tags.value | Should -Be "[variables('tags')]"
+        $template.resources.keyVault.properties.parameters.tags.value | Should -Be "[variables('tags')]"
+        $deployment.properties.parameters.tags.value | Should -Be "[variables('tags')]"
+    }
 }
 
 Describe 'Test Web App checks' {
@@ -51,6 +59,7 @@ Describe 'Test Web App checks' {
             RetryCount = 2
             RetryIntervalSeconds = 1
         }
+
         $appProperties = @{
             outboundVnetRouting = @{ allTraffic = $true }
             virtualNetworkSubnetId = '/subscriptions/test-subscription/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/test/subnets/webApp'
@@ -63,11 +72,15 @@ Describe 'Test Web App checks' {
             type = 'AzureFiles'
             protocol = 'Smb'
         }
+        $storageAccountProperties = @{ allowSharedKeyAccess = $true }
         $referenceState = @{ Status = 'Resolved'; Reads = 0 }
 
         Mock azd { $global:LASTEXITCODE = 0; 'test-token' }
         Mock Invoke-RestMethod {
             param($Uri)
+            if ($Uri -like '*/providers/Microsoft.Storage/storageAccounts/fvtttest?*') {
+                return @{ properties = $storageAccountProperties }
+            }
             if ($Uri -like '*/config/azurestorageaccounts/list?*') {
                 return @{ properties = @{ foundrydata = $mountProperties } }
             }
@@ -114,6 +127,53 @@ Describe 'Test Web App checks' {
     It 'rejects an incorrect Azure Files mount configuration' {
         $mountProperties.mountPath = '/other'
         { & $checkScript @checkParameters } | Should -Throw '*expected Azure Files SMB mount*'
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
+    It 'rejects disabled Shared Key access before readiness polling with networking <Networking>' -TestCases @(
+        @{ Networking = 'Enabled' }
+        @{ Networking = 'Disabled' }
+    ) {
+        param($Networking)
+        $checkParameters.Networking = $Networking
+        $appProperties.outboundVnetRouting.allTraffic = $Networking -eq 'Enabled'
+        if ($Networking -eq 'Disabled') {
+            $appProperties.virtualNetworkSubnetId = $null
+        }
+        $storageAccountProperties.allowSharedKeyAccess = $false
+        $storageAccountProperties.privateResponse = 'private-response-marker'
+
+        $failure = { & $checkScript @checkParameters } |
+            Should -Throw '*allowSharedKeyAccess=false*Review effective Azure Policy*runtime /data mount remain unverified*' -PassThru
+        $failure.Exception.Message | Should -Not -Match 'private-response-marker'
+        Should -Invoke Invoke-RestMethod -Times 0 -Exactly -ParameterFilter {
+            $Uri -like '*/config/azurestorageaccounts/list?*' -or
+                $Uri -like '*/config/configreferences/appsettings/*'
+        }
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+        Should -Invoke Start-Sleep -Times 0 -Exactly
+        Should -Invoke Write-Information -Times 0 -Exactly
+    }
+
+    It 'accepts the documented null default for Shared Key access' {
+        $storageAccountProperties.allowSharedKeyAccess = $null
+        (& $checkScript @checkParameters).FoundryHttpReady | Should -BeTrue
+    }
+
+    It 'does not treat an unreadable storage account as compatible' {
+        Mock Invoke-RestMethod {
+            $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Forbidden)
+            throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Storage account read forbidden.', $response)
+        } -ParameterFilter { $Uri -like '*/providers/Microsoft.Storage/storageAccounts/fvtttest?*' }
+        { & $checkScript @checkParameters } | Should -Throw '*Storage account read forbidden*'
+        Should -Invoke Invoke-WebRequest -Times 0 -Exactly
+    }
+
+    It 'rejects a storage account response without properties' {
+        Mock Invoke-RestMethod { @{} } -ParameterFilter {
+            $Uri -like '*/providers/Microsoft.Storage/storageAccounts/fvtttest?*'
+        }
+        { & $checkScript @checkParameters } | Should -Throw '*response has no properties*'
         Should -Invoke Invoke-WebRequest -Times 0 -Exactly
     }
 
@@ -238,5 +298,54 @@ Describe 'Test Web App checks' {
         Mock azd { $global:LASTEXITCODE = 1 }
         { & $checkScript @checkParameters } | Should -Throw '*Cannot obtain*'
         Should -Invoke Invoke-RestMethod -Times 0 -Exactly
+    }
+}
+
+Describe 'Isolated Web App workflow scope' {
+    BeforeAll {
+        $workflow = Get-Content (Join-Path $repoRoot '.github\workflows\test-infrastructure.yml') -Raw
+        $scopeMatch = [regex]::Match($workflow, '(?s)- name: Validate isolated Web App scope.*?run: \|\r?\n(?<code>(?:          [^\r\n]*(?:\r?\n|$))+)')
+        if (-not $scopeMatch.Success) {
+            throw 'Cannot find the isolated Web App scope check.'
+        }
+        $scopeCheck = [scriptblock]::Create(($scopeMatch.Groups['code'].Value -replace '(?m)^          ', ''))
+    }
+
+    BeforeEach {
+        $scopeEnvironment = @{
+            GITHUB_RUN_ID = '123'
+            GITHUB_RUN_ATTEMPT = '1'
+            AZURE_COMPUTE_SERVICE = 'Web App'
+            AZURE_ENV_NAME = 'fvtt-asp-on-123-1'
+            AZURE_RESOURCE_GROUP_NAME = 'rg-fvtt-asp-on-123-1'
+        }
+        $originalScopeEnvironment = @{}
+        foreach ($environmentName in $scopeEnvironment.Keys) {
+            $originalScopeEnvironment[$environmentName] = [Environment]::GetEnvironmentVariable($environmentName)
+            [Environment]::SetEnvironmentVariable($environmentName, $scopeEnvironment[$environmentName])
+        }
+    }
+
+    AfterEach {
+        foreach ($environmentName in $originalScopeEnvironment.Keys) {
+            [Environment]::SetEnvironmentVariable($environmentName, $originalScopeEnvironment[$environmentName])
+        }
+    }
+
+    It 'accepts the unique names for either networking case' {
+        { & $scopeCheck } | Should -Not -Throw
+        $env:AZURE_ENV_NAME = 'fvtt-asp-off-123-1'
+        $env:AZURE_RESOURCE_GROUP_NAME = 'rg-fvtt-asp-off-123-1'
+        { & $scopeCheck } | Should -Not -Throw
+    }
+
+    It 'rejects a target outside this run for <Name>' -TestCases @(
+        @{ Name = 'AZURE_RESOURCE_GROUP_NAME'; Value = 'production-group' }
+        @{ Name = 'AZURE_ENV_NAME'; Value = 'fvtt-asp-on-122-1' }
+        @{ Name = 'AZURE_COMPUTE_SERVICE'; Value = 'Container Instance' }
+    ) {
+        param($Name, $Value)
+        [Environment]::SetEnvironmentVariable($Name, $Value)
+        { & $scopeCheck } | Should -Throw '*require the unique Web App and resource group names*'
     }
 }

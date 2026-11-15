@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.36.1.42791",
-      "templateHash": "10802576000121888025"
+      "version": "0.48.1.52935",
+      "templateHash": "2505888811102016960"
     }
   },
   "parameters": {
@@ -53,6 +53,13 @@
           "type": "resourceGroup"
         },
         "description": "The Azure resource group where new resources will be deployed."
+      }
+    },
+    "resourceGroupTags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Additional resource group tags. The required azd-env-name tag is preserved. Use policy-related tags only with policy-owner approval."
       }
     },
     "foundryUsername": {
@@ -413,7 +420,7 @@
       "apiVersion": "2021-04-01",
       "name": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "location": "[parameters('location')]",
-      "tags": "[variables('tags')]"
+      "tags": "[union(parameters('resourceGroupTags'), variables('tags'))]"
     },
     "storageAccountReference": {
       "existing": true,
@@ -429,7 +436,7 @@
     "logAnalyticsWorkspace": {
       "condition": "[parameters('deployDiagnostics')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "log-analytics-workspace-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -3743,7 +3750,7 @@
     "networkSecurityGroupWebApp": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "network-security-group-web-app-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -4409,7 +4416,7 @@
     "networkSecurityGroupContainerApps": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "network-security-group-container-apps-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -5075,7 +5082,7 @@
     "networkSecurityGroupStorage": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "network-security-group-storage-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -5741,7 +5748,7 @@
     "networkSecurityGroupKeyVault": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "network-security-group-keyvault-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -6407,7 +6414,7 @@
     "virtualNetwork": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "virtualNetwork",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -6437,25 +6444,25 @@
                 "name": "storage",
                 "addressPrefix": "10.0.1.0/24",
                 "privateEndpointNetworkPolicies": "Disabled",
-                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(reference('networkSecurityGroupStorage'), 'outputs'), 'resourceId'), 'value'), null()), null())]"
+                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('networkSecurityGroupStorage'), null()), 'outputs'), 'resourceId'), 'value'), null()), null())]"
               },
               {
                 "name": "keyVault",
                 "addressPrefix": "10.0.2.0/24",
                 "privateEndpointNetworkPolicies": "Disabled",
-                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(reference('networkSecurityGroupKeyVault'), 'outputs'), 'resourceId'), 'value'), null()), null())]"
+                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('networkSecurityGroupKeyVault'), null()), 'outputs'), 'resourceId'), 'value'), null()), null())]"
               },
               {
                 "name": "webApp",
                 "addressPrefix": "10.0.3.0/24",
                 "delegation": "Microsoft.Web/serverFarms",
-                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(reference('networkSecurityGroupWebApp'), 'outputs'), 'resourceId'), 'value'), null()), null())]"
+                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('networkSecurityGroupWebApp'), null()), 'outputs'), 'resourceId'), 'value'), null()), null())]"
               },
               {
                 "name": "containerApps",
                 "addressPrefix": "10.0.4.0/23",
                 "delegation": "Microsoft.App/environments",
-                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(reference('networkSecurityGroupContainerApps'), 'outputs'), 'resourceId'), 'value'), null()), null())]"
+                "networkSecurityGroupResourceId": "[if(variables('effectiveDeployNetworking'), coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('networkSecurityGroupContainerApps'), null()), 'outputs'), 'resourceId'), 'value'), null()), null())]"
               },
               {
                 "name": "AzureBastionSubnet",
@@ -8272,7 +8279,7 @@
     "storageFilePrivateDnsZone": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "storage-file-private-dns-zone",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -8290,7 +8297,7 @@
           "virtualNetworkLinks": {
             "value": [
               {
-                "virtualNetworkResourceId": "[coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'resourceId'), 'value'), '')]",
+                "virtualNetworkResourceId": "[coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'resourceId'), 'value'), '')]",
                 "registrationEnabled": false
               }
             ]
@@ -11677,7 +11684,7 @@
     "keyVaultPrivateDnsZone": {
       "condition": "[variables('effectiveDeployNetworking')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "keyvault-private-dns-zone",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -11695,7 +11702,7 @@
           "virtualNetworkLinks": {
             "value": [
               {
-                "virtualNetworkResourceId": "[coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'resourceId'), 'value'), '')]",
+                "virtualNetworkResourceId": "[coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'resourceId'), 'value'), '')]",
                 "registrationEnabled": false
               }
             ]
@@ -15081,7 +15088,7 @@
     },
     "storageAccount": {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "storage-account-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -15093,7 +15100,7 @@
           "name": {
             "value": "[variables('storageAccountName')]"
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'metricCategories', createArray()))), createObject('value', createArray()))]",
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'metricCategories', createArray()))), createObject('value', createArray()))]",
           "enableHierarchicalNamespace": {
             "value": false
           },
@@ -15131,7 +15138,7 @@
               "defaultAction": "Allow"
             }
           },
-          "privateEndpoints": "[if(variables('effectiveDeployNetworking'), createObject('value', createArray(createObject('privateDnsZoneGroup', createObject('name', 'default', 'privateDnsZoneGroupConfigs', createArray(createObject('name', 'storagefiledns', 'privateDnsZoneResourceId', coalesce(tryGet(tryGet(tryGet(reference('storageFilePrivateDnsZone'), 'outputs'), 'resourceId'), 'value'), '')))), 'service', 'file', 'subnetResourceId', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 1), ''), 'tags', variables('tags')))), createObject('value', createArray()))]",
+          "privateEndpoints": "[if(variables('effectiveDeployNetworking'), createObject('value', createArray(createObject('privateDnsZoneGroup', createObject('name', 'default', 'privateDnsZoneGroupConfigs', createArray(createObject('name', 'storagefiledns', 'privateDnsZoneResourceId', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('storageFilePrivateDnsZone'), null()), 'outputs'), 'resourceId'), 'value'), '')))), 'service', 'file', 'subnetResourceId', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'subnetResourceIds'), 'value', 1), ''), 'tags', variables('tags')))), createObject('value', createArray()))]",
           "publicNetworkAccess": "[if(or(parameters('storagePublicAccess'), not(variables('effectiveDeployNetworking'))), createObject('value', 'Enabled'), createObject('value', 'Disabled'))]",
           "requireInfrastructureEncryption": {
             "value": false
@@ -23474,7 +23481,7 @@
     },
     "keyVault": {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "key-vault-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -23495,7 +23502,7 @@
           "sku": {
             "value": "standard"
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]",
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]",
           "enablePurgeProtection": {
             "value": false
           },
@@ -23529,9 +23536,9 @@
               "bypass": "AzureServices"
             }
           },
-          "privateEndpoints": "[if(variables('effectiveDeployNetworking'), createObject('value', createArray(createObject('subnetResourceId', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 2), ''), 'service', 'vault', 'privateDnsZoneGroup', createObject('name', 'default', 'privateDnsZoneGroupConfigs', createArray(createObject('name', 'keyvaultdns', 'privateDnsZoneResourceId', coalesce(tryGet(tryGet(tryGet(reference('keyVaultPrivateDnsZone'), 'outputs'), 'resourceId'), 'value'), '')))), 'tags', variables('tags')))), createObject('value', createArray()))]",
+          "privateEndpoints": "[if(variables('effectiveDeployNetworking'), createObject('value', createArray(createObject('subnetResourceId', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'subnetResourceIds'), 'value', 2), ''), 'service', 'vault', 'privateDnsZoneGroup', createObject('name', 'default', 'privateDnsZoneGroupConfigs', createArray(createObject('name', 'keyvaultdns', 'privateDnsZoneResourceId', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('keyVaultPrivateDnsZone'), null()), 'outputs'), 'resourceId'), 'value'), '')))), 'tags', variables('tags')))), createObject('value', createArray()))]",
           "roleAssignments": {
-            "value": "[concat(createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets Officer', 'principalId', parameters('principalId'), 'principalType', parameters('principalIdType'))), if(equals(parameters('computeService'), 'Web App'), createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets User', 'principalId', coalesce(tryGet(tryGet(tryGet(reference('webAppFoundryVtt'), 'outputs'), 'systemAssignedMIPrincipalId'), 'value'), ''), 'principalType', 'ServicePrincipal')), createArray()), if(equals(parameters('computeService'), 'Container App'), createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets User', 'principalId', coalesce(tryGet(tryGet(tryGet(reference('containerAppFoundryVtt'), 'outputs'), 'systemAssignedMIPrincipalId'), 'value'), ''), 'principalType', 'ServicePrincipal')), createArray()))]"
+            "value": "[concat(createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets Officer', 'principalId', parameters('principalId'), 'principalType', parameters('principalIdType'))), if(equals(parameters('computeService'), 'Web App'), createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets User', 'principalId', coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('webAppFoundryVtt'), null()), 'outputs'), 'systemAssignedMIPrincipalId'), 'value'), ''), 'principalType', 'ServicePrincipal')), createArray()), if(equals(parameters('computeService'), 'Container App'), createArray(createObject('roleDefinitionIdOrName', 'Key Vault Secrets User', 'principalId', coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppFoundryVtt'), null()), 'outputs'), 'systemAssignedMIPrincipalId'), 'value'), ''), 'principalType', 'ServicePrincipal')), createArray()))]"
           }
         },
         "template": {
@@ -26885,7 +26892,7 @@
     "appServicePlan": {
       "condition": "[equals(parameters('computeService'), 'Web App')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "app-service-plan-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -26915,7 +26922,7 @@
           "zoneRedundant": {
             "value": false
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -27607,7 +27614,7 @@
     "webAppFoundryVtt": {
       "condition": "[equals(parameters('computeService'), 'Web App')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "web-app-foundry-vtt-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -27645,7 +27652,7 @@
             }
           },
           "serverFarmResourceId": {
-            "value": "[coalesce(tryGet(tryGet(tryGet(reference('appServicePlan'), 'outputs'), 'resourceId'), 'value'), '')]"
+            "value": "[coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('appServicePlan'), null()), 'outputs'), 'resourceId'), 'value'), '')]"
           },
           "outboundVnetRouting": {
             "value": {
@@ -27713,8 +27720,8 @@
           "tags": {
             "value": "[variables('tags')]"
           },
-          "virtualNetworkSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 3), '')), createObject('value', null()))]",
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'AppServiceHTTPLogs'), createObject('category', 'AppServiceConsoleLogs'), createObject('category', 'AppServiceAppLogs'), createObject('category', 'AppServiceAuditLogs'), createObject('category', 'AppServiceIPSecAuditLogs'), createObject('category', 'AppServicePlatformLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]"
+          "virtualNetworkSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'subnetResourceIds'), 'value', 3), '')), createObject('value', null()))]",
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'AppServiceHTTPLogs'), createObject('category', 'AppServiceConsoleLogs'), createObject('category', 'AppServiceAppLogs'), createObject('category', 'AppServiceAuditLogs'), createObject('category', 'AppServiceIPSecAuditLogs'), createObject('category', 'AppServicePlatformLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -42515,7 +42522,7 @@
     "webAppDdbProxy": {
       "condition": "[and(equals(parameters('computeService'), 'Web App'), parameters('deployDdbProxy'))]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "web-app-ddbproxy-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -42524,7 +42531,7 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'AppServiceHTTPLogs'), createObject('category', 'AppServiceConsoleLogs'), createObject('category', 'AppServiceAppLogs'), createObject('category', 'AppServiceAuditLogs'), createObject('category', 'AppServiceIPSecAuditLogs'), createObject('category', 'AppServicePlatformLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]",
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'AppServiceHTTPLogs'), createObject('category', 'AppServiceConsoleLogs'), createObject('category', 'AppServiceAppLogs'), createObject('category', 'AppServiceAuditLogs'), createObject('category', 'AppServiceIPSecAuditLogs'), createObject('category', 'AppServicePlatformLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]",
           "kind": {
             "value": "app,linux,container"
           },
@@ -42532,7 +42539,7 @@
             "value": "[variables('webAppDdbProxyName')]"
           },
           "serverFarmResourceId": {
-            "value": "[coalesce(tryGet(tryGet(tryGet(reference('appServicePlan'), 'outputs'), 'resourceId'), 'value'), '')]"
+            "value": "[coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('appServicePlan'), null()), 'outputs'), 'resourceId'), 'value'), '')]"
           },
           "siteConfig": {
             "value": {
@@ -42565,7 +42572,7 @@
           "tags": {
             "value": "[variables('tags')]"
           },
-          "virtualNetworkSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 3), '')), createObject('value', null()))]"
+          "virtualNetworkSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'subnetResourceIds'), 'value', 3), '')), createObject('value', null()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -57366,7 +57373,7 @@
     "containerGroup": {
       "condition": "[equals(parameters('computeService'), 'Container Instance')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "foundry-vtt-container-group-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -58638,7 +58645,7 @@
     "containerAppEnvironment": {
       "condition": "[equals(parameters('computeService'), 'Container App')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "container-app-environment-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -58662,8 +58669,8 @@
           "internal": {
             "value": false
           },
-          "infrastructureSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'subnetResourceIds'), 'value', 4), '')), createObject('value', ''))]",
-          "appLogsConfiguration": "[if(parameters('deployDiagnostics'), createObject('value', createObject('destination', 'log-analytics', 'logAnalyticsWorkspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''))), createObject('value', createObject('destination', 'azure-monitor')))]",
+          "infrastructureSubnetResourceId": "[if(variables('effectiveDeployNetworking'), createObject('value', coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'subnetResourceIds'), 'value', 4), '')), createObject('value', ''))]",
+          "appLogsConfiguration": "[if(parameters('deployDiagnostics'), createObject('value', createObject('destination', 'log-analytics', 'logAnalyticsWorkspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''))), createObject('value', createObject('destination', 'azure-monitor')))]",
           "workloadProfiles": {
             "value": [
               {
@@ -59850,7 +59857,7 @@
     "containerAppFoundryVtt": {
       "condition": "[equals(parameters('computeService'), 'Container App')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "container-app-foundry-vtt-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -59863,7 +59870,7 @@
             "value": "[variables('containerAppFoundryVttName')]"
           },
           "environmentResourceId": {
-            "value": "[coalesce(tryGet(tryGet(tryGet(reference('containerAppEnvironment'), 'outputs'), 'resourceId'), 'value'), '')]"
+            "value": "[coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppEnvironment'), null()), 'outputs'), 'resourceId'), 'value'), '')]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -59961,7 +59968,7 @@
               "maxReplicas": 1
             }
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -61500,7 +61507,7 @@
     "containerAppDdbProxy": {
       "condition": "[and(equals(parameters('computeService'), 'Container App'), parameters('deployDdbProxy'))]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "container-app-ddbproxy-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -61513,7 +61520,7 @@
             "value": "[variables('containerAppDdbProxyName')]"
           },
           "environmentResourceId": {
-            "value": "[coalesce(tryGet(tryGet(tryGet(reference('containerAppEnvironment'), 'outputs'), 'resourceId'), 'value'), '')]"
+            "value": "[coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppEnvironment'), null()), 'outputs'), 'resourceId'), 'value'), '')]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -61564,7 +61571,7 @@
               "maxReplicas": 1
             }
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('categoryGroup', 'allLogs')), 'metricCategories', createArray()))), createObject('value', createArray())), createObject('value', createArray()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -63103,7 +63110,7 @@
     "bastionHost": {
       "condition": "[and(variables('effectiveDeployNetworking'), parameters('bastionHostDeploy'))]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "bastion-host-deployment",
       "resourceGroup": "[if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))]",
       "properties": {
@@ -63119,7 +63126,7 @@
             "value": "[parameters('location')]"
           },
           "virtualNetworkResourceId": {
-            "value": "[coalesce(tryGet(tryGet(tryGet(reference('virtualNetwork'), 'outputs'), 'resourceId'), 'value'), '')]"
+            "value": "[coalesce(tryGet(tryGet(tryGet(if(variables('effectiveDeployNetworking'), reference('virtualNetwork'), null()), 'outputs'), 'resourceId'), 'value'), '')]"
           },
           "skuName": {
             "value": "Developer"
@@ -63127,7 +63134,7 @@
           "tags": {
             "value": "[variables('tags')]"
           },
-          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'BastionAuditLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]"
+          "diagnosticSettings": "[if(parameters('deployDiagnostics'), createObject('value', createArray(createObject('name', variables('sendToLogAnalyticsName'), 'workspaceResourceId', coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), 'logCategoriesAndGroups', createArray(createObject('category', 'BastionAuditLogs')), 'metricCategories', createArray()))), createObject('value', createArray()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -64826,35 +64833,35 @@
   "outputs": {
     "WEBAPP_FOUNDRY_VTT_URL": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Web App'), coalesce(tryGet(tryGet(tryGet(reference('webAppFoundryVtt'), 'outputs'), 'defaultHostname'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Web App'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('webAppFoundryVtt'), null()), 'outputs'), 'defaultHostname'), 'value'), ''), '')]"
     },
     "WEBAPP_DDBPROXY_URL": {
       "type": "string",
-      "value": "[if(and(equals(parameters('computeService'), 'Web App'), parameters('deployDdbProxy')), coalesce(tryGet(tryGet(tryGet(reference('webAppDdbProxy'), 'outputs'), 'defaultHostname'), 'value'), ''), '')]"
+      "value": "[if(and(equals(parameters('computeService'), 'Web App'), parameters('deployDdbProxy')), coalesce(tryGet(tryGet(tryGet(if(and(equals(parameters('computeService'), 'Web App'), parameters('deployDdbProxy')), reference('webAppDdbProxy'), null()), 'outputs'), 'defaultHostname'), 'value'), ''), '')]"
     },
     "WEBAPP_FOUNDRY_VTT_RESOURCE_ID": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Web App'), coalesce(tryGet(tryGet(tryGet(reference('webAppFoundryVtt'), 'outputs'), 'resourceId'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Web App'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('webAppFoundryVtt'), null()), 'outputs'), 'resourceId'), 'value'), ''), '')]"
     },
     "CONTAINER_INSTANCE_FOUNDRY_VTT_IPV4ADDRESS": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Container Instance'), coalesce(tryGet(tryGet(tryGet(reference('containerGroup'), 'outputs'), 'iPv4Address'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Container Instance'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container Instance'), reference('containerGroup'), null()), 'outputs'), 'iPv4Address'), 'value'), ''), '')]"
     },
     "CONTAINER_INSTANCE_FOUNDRY_VTT_RESOURCE_ID": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Container Instance'), coalesce(tryGet(tryGet(tryGet(reference('containerGroup'), 'outputs'), 'resourceId'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Container Instance'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container Instance'), reference('containerGroup'), null()), 'outputs'), 'resourceId'), 'value'), ''), '')]"
     },
     "CONTAINER_APP_FOUNDRY_VTT_FQDN": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Container App'), coalesce(tryGet(tryGet(tryGet(reference('containerAppFoundryVtt'), 'outputs'), 'fqdn'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Container App'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppFoundryVtt'), null()), 'outputs'), 'fqdn'), 'value'), ''), '')]"
     },
     "CONTAINER_APP_FOUNDRY_VTT_RESOURCE_ID": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Container App'), coalesce(tryGet(tryGet(tryGet(reference('containerAppFoundryVtt'), 'outputs'), 'resourceId'), 'value'), ''), '')]"
+      "value": "[if(equals(parameters('computeService'), 'Container App'), coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppFoundryVtt'), null()), 'outputs'), 'resourceId'), 'value'), ''), '')]"
     },
     "CONTAINER_APP_DDBPROXY_FQDN": {
       "type": "string",
-      "value": "[if(and(equals(parameters('computeService'), 'Container App'), parameters('deployDdbProxy')), coalesce(tryGet(tryGet(tryGet(reference('containerAppDdbProxy'), 'outputs'), 'fqdn'), 'value'), ''), '')]"
+      "value": "[if(and(equals(parameters('computeService'), 'Container App'), parameters('deployDdbProxy')), coalesce(tryGet(tryGet(tryGet(if(and(equals(parameters('computeService'), 'Container App'), parameters('deployDdbProxy')), reference('containerAppDdbProxy'), null()), 'outputs'), 'fqdn'), 'value'), ''), '')]"
     },
     "AZURE_ENV_NAME": {
       "type": "string",
@@ -64890,15 +64897,15 @@
     },
     "LOG_ANALYTICS_WORKSPACE_NAME": {
       "type": "string",
-      "value": "[if(parameters('deployDiagnostics'), coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'name'), ''), '')]"
+      "value": "[if(parameters('deployDiagnostics'), coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'name'), 'value'), ''), '')]"
     },
     "LOG_ANALYTICS_WORKSPACE_RESOURCE_ID": {
       "type": "string",
-      "value": "[if(parameters('deployDiagnostics'), coalesce(tryGet(listOutputsWithSecureValues(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, if(not(empty(parameters('resourceGroupName'))), parameters('resourceGroupName'), format('rg-{0}', parameters('environmentName')))), 'Microsoft.Resources/deployments', 'log-analytics-workspace-deployment'), '2022-09-01'), 'resourceId'), ''), '')]"
+      "value": "[if(parameters('deployDiagnostics'), coalesce(tryGet(tryGet(tryGet(if(parameters('deployDiagnostics'), reference('logAnalyticsWorkspace'), null()), 'outputs'), 'resourceId'), 'value'), ''), '')]"
     },
     "FOUNDRY_VTT_URL": {
       "type": "string",
-      "value": "[if(equals(parameters('computeService'), 'Web App'), format('https://{0}/', coalesce(tryGet(tryGet(tryGet(reference('webAppFoundryVtt'), 'outputs'), 'defaultHostname'), 'value'), '')), if(equals(parameters('computeService'), 'Container App'), format('https://{0}/', coalesce(tryGet(tryGet(tryGet(reference('containerAppFoundryVtt'), 'outputs'), 'fqdn'), 'value'), '')), if(equals(parameters('computeService'), 'Container Instance'), format('http://{0}:30000/', coalesce(tryGet(tryGet(tryGet(reference('containerGroup'), 'outputs'), 'iPv4Address'), 'value'), '')), '')))]"
+      "value": "[if(equals(parameters('computeService'), 'Web App'), format('https://{0}/', coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Web App'), reference('webAppFoundryVtt'), null()), 'outputs'), 'defaultHostname'), 'value'), '')), if(equals(parameters('computeService'), 'Container App'), format('https://{0}/', coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container App'), reference('containerAppFoundryVtt'), null()), 'outputs'), 'fqdn'), 'value'), '')), if(equals(parameters('computeService'), 'Container Instance'), format('http://{0}:30000/', coalesce(tryGet(tryGet(tryGet(if(equals(parameters('computeService'), 'Container Instance'), reference('containerGroup'), null()), 'outputs'), 'iPv4Address'), 'value'), '')), '')))]"
     }
   }
 }

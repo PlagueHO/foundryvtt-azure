@@ -34,6 +34,7 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 - **R-7**: Container App deployments MUST use a Consumption workload profile and support scale-to-zero (`minReplicas: 0`).
 - **R-8**: The Foundry Web App MUST set the AVM parameter `outboundVnetRouting.allTraffic` to `effectiveDeployNetworking`. It MUST NOT use the nested `siteConfig.vnetRouteAllEnabled` setting. With networking disabled, routing MUST be false and VNet integration MUST be absent.
 - **C-1**: ACI deployments cannot use VNets (Azure limitation).
+- **C-2**: The current Azure Files mount uses a storage account key. The deployment environment must permit Shared Key authorization. Web App checks must reject effective `allowSharedKeyAccess: false` before readiness polling. A `null` value retains Azure's default that permits Shared Key access. Policy exclusions require policy-owner approval; approved CI exclusion tags must be limited to uniquely named test resource groups that are deleted after each case. Production must remain unchanged.
 - **G-1**: Use AVM modules (`br/public:avm/*`) for all Azure resources.  
 - **G-2**: Tags must at minimum include `azd-env-name`.  
 - **G-3**: Optional components (Bastion, DDB-Proxy, diagnostics) are toggled via boolean parameters.
@@ -47,6 +48,7 @@ Audience: Azure engineers, DevOps practitioners, and CI/CD pipelines (LLMs or hu
 | `environmentName` | string | — | Globally unique env prefix |
 | `location` | string | — | Azure region |
 | `computeService` | string | `'Web App'` | `Web App` \| `Container Instance` \| `Container App` |
+| `resourceGroupTags` | object | `{}` | Extra resource group tags only; required `azd-env-name` takes precedence |
 | `deployNetworking` | bool | `true` | VNet & PEs for Web App |
 | `foundryUsername` / `foundryPassword` / `foundryAdminKey` | secure string | — | Foundry VTT creds |
 

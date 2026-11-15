@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AZURE_CONTAINER_APP_MIN_REPLICAS` configuration parameter. Maximum replicas is hardcoded to `1`.
 - Added `ContainerApp` GitHub Environment and CI test job in `continuous-testing.yml`.
 - Added focused Web App regression checks and sequential test cases with networking enabled and disabled. Runtime Azure Files mount evidence remains a separate required check.
+- Added optional resource group tags and an opt-in Web-App-only CI run for policy-owner-approved test exclusions. Test tags default to empty, production workflows are unchanged, and isolated cases verify resource group deletion.
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Web App tests now stop before readiness polling when the deployed storage account disables Shared Key access, even if the template requests it. The error identifies the account-key mount requirement without bypassing Azure Policy or changing production. Relates to #59; runtime acceptance remains unverified.
 - Set Key Vault public access explicitly from the effective networking flag. Private deployments disable public access; deployments without networking use the intended authenticated public endpoint.
 - Improved Web App test failure messages to distinguish unresolved Key Vault reference statuses, HTTP request failures, HTTP status errors, and responses that do not identify Foundry. HTTP response bodies are not printed.
 - Added bounded retries for Azure management requests and time limits for test steps. Reference-status transport failures use the existing readiness retry limit instead of ending the test at the first reset connection.
