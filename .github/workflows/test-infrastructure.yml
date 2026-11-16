@@ -132,7 +132,7 @@ jobs:
           } else {
             $Env:REQUESTED_TEST_RESOURCE_GROUP_TAGS
           }
-          $testTags = ConvertFrom-Json -InputObject $testTagJson -AsHashtable -ErrorAction Stop
+          $testTags = ConvertFrom-Json -InputObject $testTagJson -AsHashtable -NoEnumerate -ErrorAction Stop
           if ($testTags -isnot [System.Collections.IDictionary]) {
             throw 'Web App test resource group tags must be a JSON object.'
           }
