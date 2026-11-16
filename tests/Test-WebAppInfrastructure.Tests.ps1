@@ -569,16 +569,25 @@ Describe 'Isolated Web App workflow scope' {
         Get-Content -LiteralPath $env:GITHUB_ENV | Should -BeNullOrEmpty
     }
 
-    It 'handles cleanup after a scope check with outcome <Outcome>' -TestCases @(
-        @{ Outcome = 'success'; Expected = $true }
-        @{ Outcome = 'skipped'; Expected = $true }
-        @{ Outcome = 'failure'; Expected = $false }
-        @{ Outcome = 'cancelled'; Expected = $false }
+    It 'handles cleanup for <Scenario> with scope check outcome <Outcome>' -TestCases @(
+        @{ Scenario = 'required'; Outcome = 'success'; ComputeService = 'Web App'; Isolated = $true; Tags = '{"testApproval":"approved"}'; Expected = $true }
+        @{ Scenario = 'optional'; Outcome = 'success'; ComputeService = 'Container Instance'; Isolated = $false; Tags = '{}'; Expected = $true }
+        @{ Scenario = 'optional'; Outcome = 'skipped'; ComputeService = 'Container Instance'; Isolated = $false; Tags = '{}'; Expected = $true }
+        @{ Scenario = 'Web App'; Outcome = 'skipped'; ComputeService = 'Web App'; Isolated = $false; Tags = '{}'; Expected = $false }
+        @{ Scenario = 'isolated'; Outcome = 'skipped'; ComputeService = 'Container Instance'; Isolated = $true; Tags = '{}'; Expected = $false }
+        @{ Scenario = 'tagged'; Outcome = 'skipped'; ComputeService = 'Container Instance'; Isolated = $false; Tags = '{"testApproval":"approved"}'; Expected = $false }
+        @{ Scenario = 'required'; Outcome = 'failure'; ComputeService = 'Web App'; Isolated = $false; Tags = '{}'; Expected = $false }
+        @{ Scenario = 'optional'; Outcome = 'failure'; ComputeService = 'Container Instance'; Isolated = $false; Tags = '{}'; Expected = $false }
+        @{ Scenario = 'required'; Outcome = 'cancelled'; ComputeService = 'Web App'; Isolated = $false; Tags = '{}'; Expected = $false }
+        @{ Scenario = 'optional'; Outcome = 'cancelled'; ComputeService = 'Container Instance'; Isolated = $false; Tags = '{}'; Expected = $false }
     ) {
-        param($Outcome, $Expected)
+        param($Outcome, $ComputeService, $Isolated, $Tags, $Expected)
         $condition = [regex]::Match($workflow, '- name: Delete Infrastructure\r?\n        if: (?<condition>[^\r\n]+)').Groups['condition'].Value
         $condition | Should -Not -BeNullOrEmpty
-        $condition = $condition.Replace('always()', '$true').Replace('steps.isolated_scope.outcome', "'$Outcome'").Replace('&&', '-and').Replace('||', '-or').Replace('==', '-eq')
+        $condition = $condition.Replace('always()', '$true').Replace('steps.isolated_scope.outcome', "'$Outcome'").
+            Replace('env.AZURE_COMPUTE_SERVICE', "'$ComputeService'").Replace('!inputs.ISOLATED_WEBAPP_TEST', ('-not $' + $Isolated)).
+            Replace('env.AZURE_RESOURCE_GROUP_TAGS', "'$Tags'").Replace('&&', '-and').Replace('||', '-or').
+            Replace('==', '-eq').Replace('!=', '-ne')
         (& ([scriptblock]::Create($condition))) | Should -Be $Expected
     }
 }
