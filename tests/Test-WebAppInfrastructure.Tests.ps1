@@ -494,7 +494,12 @@ Describe 'Isolated Web App workflow scope' {
             AZURE_COMPUTE_SERVICE = 'Web App'
             AZURE_ENV_NAME = 'fvtt-asp-on-123-1'
             AZURE_RESOURCE_GROUP_NAME = 'rg-fvtt-asp-on-123-1'
+            AZURE_RESOURCE_GROUP_TAGS = '{}'
+            REQUESTED_TEST_RESOURCE_GROUP_TAGS = ''
+            CONFIGURED_TEST_RESOURCE_GROUP_TAGS = '{}'
+            GITHUB_ENV = (Join-Path $TestDrive 'scope-github-env')
         }
+        New-Item -ItemType File -Path $scopeEnvironment.GITHUB_ENV -Force | Out-Null
         $originalScopeEnvironment = @{}
         foreach ($environmentName in $scopeEnvironment.Keys) {
             $originalScopeEnvironment[$environmentName] = [Environment]::GetEnvironmentVariable($environmentName)
@@ -523,5 +528,53 @@ Describe 'Isolated Web App workflow scope' {
         param($Name, $Value)
         [Environment]::SetEnvironmentVariable($Name, $Value)
         { & $scopeCheck } | Should -Throw '*require the unique Web App and resource group names*'
+    }
+
+    It 'accepts approved tags only with the unique Web App test scope' {
+        $env:CONFIGURED_TEST_RESOURCE_GROUP_TAGS = '{"testApproval":"approved"}'
+        { & $scopeCheck } | Should -Not -Throw
+        $env:AZURE_RESOURCE_GROUP_NAME = 'production-group'
+        { & $scopeCheck } | Should -Throw '*require the unique Web App and resource group names*'
+    }
+
+    It 'selects <Selection> tags and passes compact JSON to later deployment steps' -TestCases @(
+        @{ Selection = 'environment'; Requested = ''; Expected = '{"testApproval":"approved"}' }
+        @{ Selection = 'explicit'; Requested = '{"manualApproval":"approved"}'; Expected = '{"manualApproval":"approved"}' }
+        @{ Selection = 'disabled'; Requested = '{}'; Expected = '{}' }
+    ) {
+        param($Requested, $Expected)
+        $env:CONFIGURED_TEST_RESOURCE_GROUP_TAGS = "{`n  `"testApproval`": `"approved`"`n}"
+        $env:REQUESTED_TEST_RESOURCE_GROUP_TAGS = $Requested
+        & $scopeCheck
+        @(Get-Content -LiteralPath $env:GITHUB_ENV).Count | Should -Be 1
+        (Get-Content -LiteralPath $env:GITHUB_ENV) | Should -Be "AZURE_RESOURCE_GROUP_TAGS=$Expected"
+    }
+
+    It 'rejects non-object resource group tags <Tags>' -TestCases @(
+        @{ Tags = '[]' }
+        @{ Tags = '"tag"' }
+        @{ Tags = 'null' }
+    ) {
+        param($Tags)
+        $env:REQUESTED_TEST_RESOURCE_GROUP_TAGS = $Tags
+        { & $scopeCheck } | Should -Throw '*must be a JSON object*'
+    }
+
+    It 'rejects malformed resource group tags before deployment' {
+        $env:REQUESTED_TEST_RESOURCE_GROUP_TAGS = '{'
+        { & $scopeCheck } | Should -Throw
+    }
+
+    It 'handles cleanup after a scope check with outcome <Outcome>' -TestCases @(
+        @{ Outcome = 'success'; Expected = $true }
+        @{ Outcome = 'skipped'; Expected = $true }
+        @{ Outcome = 'failure'; Expected = $false }
+        @{ Outcome = 'cancelled'; Expected = $false }
+    ) {
+        param($Outcome, $Expected)
+        $condition = [regex]::Match($workflow, '- name: Delete Infrastructure\r?\n        if: (?<condition>[^\r\n]+)').Groups['condition'].Value
+        $condition | Should -Not -BeNullOrEmpty
+        $condition = $condition.Replace('always()', '$true').Replace('steps.isolated_scope.outcome', "'$Outcome'").Replace('&&', '-and').Replace('||', '-or').Replace('==', '-eq')
+        (& ([scriptblock]::Create($condition))) | Should -Be $Expected
     }
 }

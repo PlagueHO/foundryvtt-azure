@@ -20,10 +20,9 @@ on:
         required: false
         type: string
       AZURE_RESOURCE_GROUP_TAGS:
-        description: "JSON object of tags for this test group only. Policy-related tags require policy-owner approval."
+        description: "JSON tags for this test group. Empty uses TEST_RESOURCE_GROUP_TAGS in the WebApp environment only; '{}' disables it."
         required: false
         type: string
-        default: '{}'
       ISOLATED_WEBAPP_TEST:
         description: "Disable optional services and storage locks for an approved isolated Web App test, and verify group deletion."
         required: false
@@ -82,7 +81,7 @@ jobs:
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION || vars.AZURE_LOCATION }}
       AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
-      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.AZURE_RESOURCE_GROUP_TAGS }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.AZURE_RESOURCE_GROUP_TAGS || '{}' }}
 
       # Optional azd parameters when using Federated Credentials
       AZURE_PRINCIPAL_ID_TYPE: 'ServicePrincipal'
@@ -115,8 +114,11 @@ jobs:
 
       - name: Validate isolated Web App scope
         id: isolated_scope
-        if: inputs.ISOLATED_WEBAPP_TEST
+        if: env.AZURE_COMPUTE_SERVICE == 'Web App' || inputs.ISOLATED_WEBAPP_TEST || env.AZURE_RESOURCE_GROUP_TAGS != '{}'
         shell: pwsh
+        env:
+          REQUESTED_TEST_RESOURCE_GROUP_TAGS: ${{ inputs.AZURE_RESOURCE_GROUP_TAGS }}
+          CONFIGURED_TEST_RESOURCE_GROUP_TAGS: ${{ inputs.ENVIRONMENT == 'WebApp' && vars.TEST_RESOURCE_GROUP_TAGS || '{}' }}
         run: |
           $expectedSuffix = "-$Env:GITHUB_RUN_ID-$Env:GITHUB_RUN_ATTEMPT"
           $allowedNames = @("fvtt-asp-on$expectedSuffix", "fvtt-asp-off$expectedSuffix")
@@ -125,6 +127,17 @@ jobs:
               $Env:AZURE_RESOURCE_GROUP_NAME -cne "rg-$Env:AZURE_ENV_NAME") {
             throw 'Isolated Web App tests require the unique Web App and resource group names for this workflow run.'
           }
+          $testTagJson = if ([string]::IsNullOrEmpty($Env:REQUESTED_TEST_RESOURCE_GROUP_TAGS)) {
+            $Env:CONFIGURED_TEST_RESOURCE_GROUP_TAGS
+          } else {
+            $Env:REQUESTED_TEST_RESOURCE_GROUP_TAGS
+          }
+          $testTags = ConvertFrom-Json -InputObject $testTagJson -AsHashtable -ErrorAction Stop
+          if ($testTags -isnot [System.Collections.IDictionary]) {
+            throw 'Web App test resource group tags must be a JSON object.'
+          }
+          "AZURE_RESOURCE_GROUP_TAGS=$($testTags | ConvertTo-Json -Compress -Depth 20)" |
+            Add-Content -LiteralPath $Env:GITHUB_ENV
 
       - name: Install azd
         uses: Azure/setup-azd@v2.4.0
@@ -200,12 +213,12 @@ jobs:
           retention-days: 7
 
       - name: Delete Infrastructure
-        if: always() && (!inputs.ISOLATED_WEBAPP_TEST || steps.isolated_scope.outcome == 'success')
+        if: always() && (steps.isolated_scope.outcome == 'success' || steps.isolated_scope.outcome == 'skipped')
         timeout-minutes: 15
         run: azd down --no-prompt --purge --force
 
       - name: Verify isolated test group deletion
-        if: always() && inputs.ISOLATED_WEBAPP_TEST && steps.isolated_scope.outcome == 'success'
+        if: always() && steps.isolated_scope.outcome == 'success'
         timeout-minutes: 2
         shell: pwsh
         run: |

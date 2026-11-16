@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Automatic Web App CI tests can use approved policy-exclusion tags from the `WebApp` GitHub environment. Test scope is checked before provisioning and cleanup; production and other compute environments do not inherit these tags.
 - Live Web App mount capture now waits for a terminating newline before parsing JSON, so a WebSocket frame split inside the mount record does not cause a false failure.
 - Web App tests now stop before readiness polling when the deployed storage account disables Shared Key access, even if the template requests it. The error identifies the account-key mount requirement without bypassing Azure Policy or changing production. Relates to #59; runtime acceptance remains unverified.
 - Set Key Vault public access explicitly from the effective networking flag. Private deployments disable public access; deployments without networking use the intended authenticated public endpoint.
