@@ -550,19 +550,23 @@ Describe 'Isolated Web App workflow scope' {
         (Get-Content -LiteralPath $env:GITHUB_ENV) | Should -Be "AZURE_RESOURCE_GROUP_TAGS=$Expected"
     }
 
-    It 'rejects non-object resource group tags <Tags>' -TestCases @(
-        @{ Tags = '[]' }
-        @{ Tags = '"tag"' }
-        @{ Tags = 'null' }
+    It 'rejects non-object resource group tags <Tags> from <Setting>' -TestCases @(
+        @{ Tags = '[]'; Setting = 'REQUESTED_TEST_RESOURCE_GROUP_TAGS' }
+        @{ Tags = '"tag"'; Setting = 'REQUESTED_TEST_RESOURCE_GROUP_TAGS' }
+        @{ Tags = 'null'; Setting = 'REQUESTED_TEST_RESOURCE_GROUP_TAGS' }
+        @{ Tags = '[{"testApproval":"approved"}]'; Setting = 'REQUESTED_TEST_RESOURCE_GROUP_TAGS' }
+        @{ Tags = '[{"testApproval":"approved"}]'; Setting = 'CONFIGURED_TEST_RESOURCE_GROUP_TAGS' }
     ) {
-        param($Tags)
-        $env:REQUESTED_TEST_RESOURCE_GROUP_TAGS = $Tags
+        param($Tags, $Setting)
+        [Environment]::SetEnvironmentVariable($Setting, $Tags)
         { & $scopeCheck } | Should -Throw '*must be a JSON object*'
+        Get-Content -LiteralPath $env:GITHUB_ENV | Should -BeNullOrEmpty
     }
 
     It 'rejects malformed resource group tags before deployment' {
         $env:REQUESTED_TEST_RESOURCE_GROUP_TAGS = '{'
         { & $scopeCheck } | Should -Throw
+        Get-Content -LiteralPath $env:GITHUB_ENV | Should -BeNullOrEmpty
     }
 
     It 'handles cleanup after a scope check with outcome <Outcome>' -TestCases @(
