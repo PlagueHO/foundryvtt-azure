@@ -15,6 +15,8 @@ BeforeAll {
         $state = @{
             Mounts = @(@{ mountPoint = '/data'; fileSystem = 'cifs'; source = '//fvtttest.file.core.windows.net/foundryvttdata' })
             FragmentSize = 17
+            SplitAfterMountObject = $false
+            LineEnding = "`r`n"
             Offset = 0
             Disposed = $false
             CloseWithoutRecord = $false
@@ -58,7 +60,11 @@ BeforeAll {
             $this.TestState.RemoteScript = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encodedScript))
             $marker = [regex]::Match($this.TestState.RemoteScript, 'FVTT_MOUNT_[a-f0-9]{32}').Value
             $data = @{ mounts = @($this.TestState.Mounts) } | ConvertTo-Json -Compress -Depth 4
-            $this.TestState.Bytes = [Text.Encoding]::UTF8.GetBytes("$command`r`n$marker $data`r`n")
+            $prefix = "$command`r`n$marker "
+            $this.TestState.Bytes = [Text.Encoding]::UTF8.GetBytes("$prefix$data$($this.TestState.LineEnding)")
+            if ($this.TestState.SplitAfterMountObject) {
+                $this.TestState.SplitOffset = [Text.Encoding]::UTF8.GetByteCount($prefix + $data.Substring(0, $data.LastIndexOf(']}')))
+            }
             return [Threading.Tasks.Task]::CompletedTask
         }
         $socket | Add-Member ScriptMethod ReceiveAsync {
@@ -69,6 +75,9 @@ BeforeAll {
                 $result = [Net.WebSockets.WebSocketReceiveResult]::new(0, [Net.WebSockets.WebSocketMessageType]::Close, $true)
             } else {
                 $count = [Math]::Min($this.TestState.FragmentSize, $remaining)
+                if ($this.TestState.SplitAfterMountObject -and $this.TestState.Offset -lt $this.TestState.SplitOffset) {
+                    $count = [Math]::Min($count, $this.TestState.SplitOffset - $this.TestState.Offset)
+                }
                 [Array]::Copy($this.TestState.Bytes, $this.TestState.Offset, $Buffer.Array, $Buffer.Offset, $count)
                 $this.TestState.Offset += $count
                 $result = [Net.WebSockets.WebSocketReceiveResult]::new($count, [Net.WebSockets.WebSocketMessageType]::Binary, $false)
@@ -393,6 +402,30 @@ Describe 'Test Web App checks' {
         $actualRecord | Should -Not -Match 'private-option'
         $actualMount = ($actualRecord -replace '^FVTT_MOUNT_[a-f0-9]{32} ', '') | ConvertFrom-Json
         $actualMount.mounts[0].source | Should -Be '//fvtttest.file.core.windows.net/foundryvttdata'
+    }
+
+    It 'waits for the complete mount record after an inner closing brace with <EndingName>' -TestCases @(
+        @{ EndingName = 'CRLF'; LineEnding = "`r`n" }
+        @{ EndingName = 'LF'; LineEnding = "`n" }
+    ) {
+        param($LineEnding)
+        $socket = Get-TestWebSocket
+        $socket.TestState.SplitAfterMountObject = $true
+        $socket.TestState.LineEnding = $LineEnding
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        (& $checkScript @checkParameters).RuntimeMountVerified | Should -BeTrue
+        $socket.TestState.Offset | Should -Be $socket.TestState.Bytes.Length
+        $socket.TestState.Disposed | Should -BeTrue
+    }
+
+    It 'rejects a complete mount record without a terminating newline' {
+        $socket = Get-TestWebSocket
+        $socket.TestState.LineEnding = ''
+        Mock New-Object { $socket } -ParameterFilter { $TypeName -eq 'System.Net.WebSockets.ClientWebSocket' }
+        $checkParameters.CaptureRuntimeMount = $true
+        { & $checkScript @checkParameters } | Should -Throw '*closed without current mount evidence*'
+        $socket.TestState.Disposed | Should -BeTrue
     }
 
     It 'rejects live evidence for <FileSystem> on <Source>' -TestCases @(

@@ -124,7 +124,7 @@ const mounts = lines.map(line => {
 process.stdout.write('FVTT_MOUNT_$nonce ' + JSON.stringify({ mounts }) + '\n');
 "@
     $encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
-    $command = "stty -echo; printf '\n'; node -e `"eval(Buffer.from('$encodedScript','base64').toString('utf8'))`"; exit`n"
+    $command = "printf '\n'; node -e `"eval(Buffer.from('$encodedScript','base64').toString('utf8'))`"; exit`n"
     $socket = New-Object System.Net.WebSockets.ClientWebSocket
     $timeout = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(60))
     try {
@@ -147,7 +147,7 @@ process.stdout.write('FVTT_MOUNT_$nonce ' + JSON.stringify({ mounts }) + '\n');
             if ($output.Length -gt 65536) {
                 throw 'Application-container mount capture exceeded its output limit. Raw terminal output is not printed.'
             }
-            $record = [regex]::Match($output.ToString(), "(?m)^FVTT_MOUNT_$nonce (?<data>\{[^\r\n]+\})\r?$")
+            $record = [regex]::Match($output.ToString(), "(?m)^FVTT_MOUNT_$nonce (?<data>\{[^\r\n]+\})\r?\n")
             if ($record.Success) {
                 $evidence = $record.Groups['data'].Value | ConvertFrom-Json
                 $sourcePattern = '^//{0}\.file\.[^/\s]+/foundryvttdata$' -f [regex]::Escape($ExpectedStorageAccount)
