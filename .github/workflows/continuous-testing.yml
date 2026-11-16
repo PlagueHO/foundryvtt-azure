@@ -16,10 +16,9 @@ on:
         type: boolean
         default: false
       TEST_RESOURCE_GROUP_TAGS:
-        description: "JSON object of tags for the two Web App test groups only. Policy-related tags require policy-owner approval."
+        description: "JSON tags for Web App test groups. Empty uses the WebApp environment setting; '{}' disables it. Policy-related tags require policy-owner approval."
         required: false
         type: string
-        default: '{}'
       TEST_AZURE_LOCATION:
         description: "Override the region for the two Web App tests. Otherwise use the WebApp environment variable."
         required: false
@@ -44,7 +43,7 @@ jobs:
     with:
       ENVIRONMENT: WebApp
       AZURE_LOCATION: ${{ inputs.TEST_AZURE_LOCATION }}
-      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS || '{}' }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS }}
       ISOLATED_WEBAPP_TEST: ${{ inputs.WEBAPP_ONLY || false }}
       AZURE_ENV_NAME: ${{ format('fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-on-{0}-{1}', github.run_id, github.run_attempt) }}
@@ -67,7 +66,7 @@ jobs:
     with:
       ENVIRONMENT: WebApp
       AZURE_LOCATION: ${{ inputs.TEST_AZURE_LOCATION }}
-      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS || '{}' }}
+      AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.TEST_RESOURCE_GROUP_TAGS }}
       ISOLATED_WEBAPP_TEST: ${{ inputs.WEBAPP_ONLY || false }}
       AZURE_ENV_NAME: ${{ format('fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
       AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-asp-off-{0}-{1}', github.run_id, github.run_attempt) }}
