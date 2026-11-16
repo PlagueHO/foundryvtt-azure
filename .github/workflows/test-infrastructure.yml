@@ -213,7 +213,7 @@ jobs:
           retention-days: 7
 
       - name: Delete Infrastructure
-        if: always() && (steps.isolated_scope.outcome == 'success' || steps.isolated_scope.outcome == 'skipped')
+        if: always() && (steps.isolated_scope.outcome == 'success' || (steps.isolated_scope.outcome == 'skipped' && env.AZURE_COMPUTE_SERVICE != 'Web App' && !inputs.ISOLATED_WEBAPP_TEST && env.AZURE_RESOURCE_GROUP_TAGS == '{}'))
         timeout-minutes: 15
         run: azd down --no-prompt --purge --force
 
