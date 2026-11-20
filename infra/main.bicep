@@ -150,6 +150,7 @@ var containerInstanceFoundryVttName string = '${abbrs.containerInstanceContainer
 var containerAppEnvironmentName string = '${abbrs.appManagedEnvironments}${environmentName}'
 var containerAppFoundryVttName string = '${abbrs.appContainerApps}${environmentName}'
 var containerAppDdbProxyName string = take('${abbrs.appContainerApps}${environmentName}ddbproxy', 32)
+var containerAppIdentityName string = take('${abbrs.managedIdentityUserAssignedIdentities}${environmentName}', 128)
 var bastionHostName string = '${abbrs.networkBastionHosts}${environmentName}'
 var keyVaultPrivateDnsZoneName = 'privatelink.vaultcore.azure.net'
 var logAnalyticsWorkspaceName = take('${abbrs.operationalInsightsWorkspaces}${environmentName}', 63)
@@ -161,7 +162,7 @@ var foundryUsernameSecretName   = 'foundryUsername'
 var foundryPasswordSecretName   = 'foundryPassword'
 var foundryAdminKeySecretName   = 'foundryAdminKey'
 
-// Key Vault URI constructed from name (avoids circular dependency with Container App modules)
+// Key Vault URI constructed from name for secret references.
 var keyVaultUri string = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/'
 
 // Docker image names
@@ -496,7 +497,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.14.2' = {
       (computeService == 'Container App' ? [
         {
           roleDefinitionIdOrName: 'Key Vault Secrets User'
-          principalId: containerAppFoundryVtt.?outputs.?systemAssignedMIPrincipalId ?? ''
+          principalId: containerAppIdentity.?outputs.?principalId ?? ''
           principalType: 'ServicePrincipal'
         }
       ] : [])
@@ -755,6 +756,16 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.
 // TBC: Support for DB Proxy in Container Instance - will require a second container instance because needs to be exposed publicaly
 
 // ------------- CONTAINER APPS ENVIRONMENT (IF COMPUTE SERVICE IS CONTAINER APP) -------------
+module containerAppIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.6.0' = if (computeService == 'Container App') {
+  name: 'container-app-identity-deployment'
+  scope: rg
+  params: {
+    name: containerAppIdentityName
+    location: location
+    tags: tags
+  }
+}
+
 module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = if (computeService == 'Container App') {
   name: 'container-app-environment-deployment'
   scope: rg
@@ -795,6 +806,9 @@ module containerAppEnvironment 'br/public:avm/res/app/managed-environment:0.13.3
 module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.22.1' = if (computeService == 'Container App') {
   name: 'container-app-foundry-vtt-deployment'
   scope: rg
+  dependsOn: [
+    keyVault
+  ]
   params: {
     name: containerAppFoundryVttName
     environmentResourceId: containerAppEnvironment.?outputs.?resourceId ?? ''
@@ -803,6 +817,9 @@ module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.22.1' = if 
     workloadProfileName: 'Consumption'
     managedIdentities: {
       systemAssigned: true
+      userAssignedResourceIds: [
+        containerAppIdentity.?outputs.?resourceId ?? ''
+      ]
     }
     containers: [
       {
@@ -834,17 +851,17 @@ module containerAppFoundryVtt 'br/public:avm/res/app/container-app:0.22.1' = if 
       {
         name: 'foundry-username'
         keyVaultUrl: '${keyVaultUri}secrets/${foundryUsernameSecretName}'
-        identity: 'system'
+        identity: containerAppIdentity.?outputs.?resourceId ?? ''
       }
       {
         name: 'foundry-password'
         keyVaultUrl: '${keyVaultUri}secrets/${foundryPasswordSecretName}'
-        identity: 'system'
+        identity: containerAppIdentity.?outputs.?resourceId ?? ''
       }
       {
         name: 'foundry-admin-key'
         keyVaultUrl: '${keyVaultUri}secrets/${foundryAdminKeySecretName}'
-        identity: 'system'
+        identity: containerAppIdentity.?outputs.?resourceId ?? ''
       }
     ]
     ingressExternal: true
