@@ -241,18 +241,18 @@ jobs:
 
       - name: Delete Infrastructure
         if: always() && steps.test_scope.outcome == 'success' && steps.cleanup_scope.outputs.scope_validated == 'true'
-        timeout-minutes: 10
+        timeout-minutes: 20
         shell: pwsh
         run: azd down --environment "$Env:AZURE_ENV_NAME" --no-prompt --purge --force
 
       - name: Verify test group deletion and remove remaining resources
         if: always() && steps.test_scope.outcome == 'success'
-        timeout-minutes: 20
+        timeout-minutes: 30
         shell: pwsh
         run: |
           ./scripts/Remove-TestInfrastructure.ps1 `
             -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID -TenantId $Env:AZURE_TENANT_ID `
             -EnvironmentName $Env:AZURE_ENV_NAME -ResourceGroupName $Env:AZURE_RESOURCE_GROUP_NAME `
-            -ComputeService $Env:AZURE_COMPUTE_SERVICE `
+            -ComputeService $Env:AZURE_COMPUTE_SERVICE -TimeoutSeconds 1500 `
             -RunId $Env:GITHUB_RUN_ID -RunAttempt $Env:GITHUB_RUN_ATTEMPT -Confirm:$false `
             -EvidencePath (Join-Path $Env:RUNNER_TEMP 'test-cleanup-evidence.json')

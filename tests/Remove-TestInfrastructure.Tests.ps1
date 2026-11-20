@@ -321,10 +321,10 @@ Describe 'Compiled Container App secret deployment order' {
 }
 
 Describe 'Workflow cleanup after provisioning failure' {
-    It 'keeps separate always-run limits for azd deletion and fallback verification' {
+    It 'allows bounded time for slow azd deletion and fallback verification' {
         $workflow = Get-Content (Join-Path $repoRoot '.github\workflows\test-infrastructure.yml') -Raw
-        $workflow | Should -Match '(?s)name: Delete Infrastructure\s+if: always\(\).*?timeout-minutes: 10'
-        $workflow | Should -Match '(?s)name: Verify test group deletion and remove remaining resources\s+if: always\(\).*?timeout-minutes: 20'
+        $workflow | Should -Match '(?s)name: Delete Infrastructure\s+if: always\(\).*?timeout-minutes: 20'
+        $workflow | Should -Match '(?s)name: Verify test group deletion and remove remaining resources\s+if: always\(\).*?timeout-minutes: 30.*?-TimeoutSeconds 1500'
         $workflow | Should -Not -Match 'continue-on-error: true'
     }
 }
