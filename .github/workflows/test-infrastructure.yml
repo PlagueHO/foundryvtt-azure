@@ -70,7 +70,7 @@ on:
 jobs:
   test-infrastructure:
     name: Test ${{ inputs.ENVIRONMENT }} Infrastructure
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       # Required for azd to authenticate with Azure using Federated Credentials
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -80,7 +80,7 @@ jobs:
       # Required for azd to provision the infrastructure
       AZURE_ENV_NAME: ${{ inputs.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION || vars.AZURE_LOCATION }}
-      AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ inputs.AZURE_RESOURCE_GROUP_NAME || format('rg-{0}', inputs.AZURE_ENV_NAME) }}
       AZURE_RESOURCE_GROUP_TAGS: ${{ inputs.AZURE_RESOURCE_GROUP_TAGS || '{}' }}
 
       # Optional azd parameters when using Federated Credentials
@@ -113,7 +113,6 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Validate isolated Web App scope
-        id: isolated_scope
         if: env.AZURE_COMPUTE_SERVICE == 'Web App' || inputs.ISOLATED_WEBAPP_TEST || env.AZURE_RESOURCE_GROUP_TAGS != '{}'
         shell: pwsh
         env:
@@ -142,6 +141,10 @@ jobs:
       - name: Install azd
         uses: Azure/setup-azd@v2.4.0
 
+      - name: Record azd version
+        shell: pwsh
+        run: azd version
+
       - name: Authenticate azd (Federated Credentials)
         run: |
           azd auth login `
@@ -150,8 +153,18 @@ jobs:
             --tenant-id "$Env:AZURE_TENANT_ID"
         shell: pwsh
 
+      - name: Validate exact test target
+        id: test_scope
+        shell: pwsh
+        run: |
+          ./scripts/Remove-TestInfrastructure.ps1 `
+            -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID -TenantId $Env:AZURE_TENANT_ID `
+            -EnvironmentName $Env:AZURE_ENV_NAME -ResourceGroupName $Env:AZURE_RESOURCE_GROUP_NAME `
+            -ComputeService $Env:AZURE_COMPUTE_SERVICE `
+            -RunId $Env:GITHUB_RUN_ID -RunAttempt $Env:GITHUB_RUN_ATTEMPT -ValidateOnly
+
       - name: Provision Infrastructure
-        timeout-minutes: 20
+        timeout-minutes: ${{ env.AZURE_COMPUTE_SERVICE == 'Container App' && 40 || 20 }}
         shell: pwsh
         run: |
           # Stream output to logs while also capturing it for targeted failure handling.
@@ -212,33 +225,34 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Delete Infrastructure
-        if: always() && (steps.isolated_scope.outcome == 'success' || (steps.isolated_scope.outcome == 'skipped' && env.AZURE_COMPUTE_SERVICE != 'Web App' && !inputs.ISOLATED_WEBAPP_TEST && env.AZURE_RESOURCE_GROUP_TAGS == '{}'))
-        timeout-minutes: 15
-        run: azd down --no-prompt --purge --force
-
-      - name: Verify isolated test group deletion
-        if: always() && steps.isolated_scope.outcome == 'success'
-        timeout-minutes: 2
+      - name: Inspect and stop active test deployments
+        id: cleanup_scope
+        if: always() && steps.test_scope.outcome == 'success'
+        timeout-minutes: 5
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          if ([string]::IsNullOrWhiteSpace($Env:AZURE_RESOURCE_GROUP_NAME)) {
-            throw 'Cannot verify deletion without the exact isolated test group name.'
-          }
-          try {
-            $token = & azd auth token --tenant-id $Env:AZURE_TENANT_ID --scope 'https://management.azure.com/.default' --no-prompt
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
-              throw 'Cannot obtain a token to verify isolated test group deletion.'
-            }
-            $headers = @{ Authorization = "Bearer $token" }
-            $groupUri = "https://management.azure.com/subscriptions/$([uri]::EscapeDataString($Env:AZURE_SUBSCRIPTION_ID))/resourceGroups/$([uri]::EscapeDataString($Env:AZURE_RESOURCE_GROUP_NAME))?api-version=2024-03-01"
-            $response = Invoke-WebRequest -Uri $groupUri -Headers $headers -SkipHttpErrorCheck -TimeoutSec 30
-            if ($response.StatusCode -ne 404) {
-              throw "Isolated test group deletion is not verified. ARM returned HTTP $([int]$response.StatusCode)."
-            }
-            "Isolated test group deletion: verified (HTTP 404)." |
-              Add-Content -Path $Env:GITHUB_STEP_SUMMARY
-          } finally {
-            Remove-Variable -Name token, headers, response -Force -ErrorAction SilentlyContinue
-          }
+          ./scripts/Remove-TestInfrastructure.ps1 `
+            -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID -TenantId $Env:AZURE_TENANT_ID `
+            -EnvironmentName $Env:AZURE_ENV_NAME -ResourceGroupName $Env:AZURE_RESOURCE_GROUP_NAME `
+            -ComputeService $Env:AZURE_COMPUTE_SERVICE `
+            -RunId $Env:GITHUB_RUN_ID -RunAttempt $Env:GITHUB_RUN_ATTEMPT `
+            -StopDeploymentsOnly -TimeoutSeconds 240 -Confirm:$false `
+            -EvidencePath (Join-Path $Env:RUNNER_TEMP 'test-cleanup-evidence.json')
+
+      - name: Delete Infrastructure
+        if: always() && steps.test_scope.outcome == 'success' && steps.cleanup_scope.outputs.scope_validated == 'true'
+        timeout-minutes: 10
+        shell: pwsh
+        run: azd down --environment "$Env:AZURE_ENV_NAME" --no-prompt --purge --force
+
+      - name: Verify test group deletion and remove remaining resources
+        if: always() && steps.test_scope.outcome == 'success'
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          ./scripts/Remove-TestInfrastructure.ps1 `
+            -SubscriptionId $Env:AZURE_SUBSCRIPTION_ID -TenantId $Env:AZURE_TENANT_ID `
+            -EnvironmentName $Env:AZURE_ENV_NAME -ResourceGroupName $Env:AZURE_RESOURCE_GROUP_NAME `
+            -ComputeService $Env:AZURE_COMPUTE_SERVICE `
+            -RunId $Env:GITHUB_RUN_ID -RunAttempt $Env:GITHUB_RUN_ATTEMPT -Confirm:$false `
+            -EvidencePath (Join-Path $Env:RUNNER_TEMP 'test-cleanup-evidence.json')

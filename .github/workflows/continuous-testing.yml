@@ -91,8 +91,9 @@ jobs:
     with:
       ENVIRONMENT: ContainerApp
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-      AZURE_ENV_NAME: ${{ format('fvtt-aca-{0}-{1}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aca-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_ENV_NAME: ${{ format('fvtt-aca-{0}-{1}', github.run_id, github.run_attempt) }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aca-{0}-{1}', github.run_id, github.run_attempt) }}
+      AZURE_COMPUTE_SERVICE: 'Container App'
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -110,8 +111,9 @@ jobs:
     with:
       ENVIRONMENT: ContainerInstance
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-      AZURE_ENV_NAME: ${{ format('fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
-      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aci-{0}-{1}', github.ref_name, github.run_id) }}
+      AZURE_ENV_NAME: ${{ format('fvtt-aci-{0}-{1}', github.run_id, github.run_attempt) }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ format('rg-fvtt-aci-{0}-{1}', github.run_id, github.run_attempt) }}
+      AZURE_COMPUTE_SERVICE: 'Container Instance'
       # This deployment can fail with '(403) Forbidden.' when tenant policy blocks storage accounts with public endpoints.
       ALLOW_STORAGE_POLICY_403_FORBIDDEN: true
     secrets:

@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Container App Key Vault secret deployment order with an AVM user-assigned managed identity. The vault, secrets, and access assignment now deploy before the app. Web App identity behavior is unchanged.
+- Container App CI provisioning now has a separate 40-minute limit. All compute tests use run-specific targets, capture safe deployment diagnostics, stop matching active deployments, and verify cleanup independently of azd outputs. Guarded fallback deletion cannot report success until ARM returns HTTP 404. Relates to #67; live Azure acceptance remains unverified.
+
 - Automatic Web App CI tests can use approved policy-exclusion tags from the `WebApp` GitHub environment. Test scope is checked before provisioning and cleanup; production and other compute environments do not inherit these tags.
 - Live Web App mount capture now waits for a terminating newline before parsing JSON, so a WebSocket frame split inside the mount record does not cause a false failure.
 - Web App tests now stop before readiness polling when the deployed storage account disables Shared Key access, even if the template requests it. The error identifies the account-key mount requirement without bypassing Azure Policy or changing production. Relates to #59; runtime acceptance remains unverified.

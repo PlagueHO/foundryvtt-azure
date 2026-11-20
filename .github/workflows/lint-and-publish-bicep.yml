@@ -19,13 +19,13 @@ jobs:
     - name: Build Bicep
       run: bicep build ./infra/main.bicep
 
-    - name: Test Web App routing and validation checks
+    - name: Test infrastructure routing, identity, and cleanup checks
       shell: pwsh
       run: |
         Import-Module Pester -MinimumVersion 5.0
-        $result = Invoke-Pester -Path ./tests/Test-WebAppInfrastructure.Tests.ps1 -PassThru -Output Detailed
+        $result = Invoke-Pester -Path ./tests/ -PassThru -Output Detailed
         if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) {
-          throw 'Web App regression checks failed or no tests passed.'
+          throw 'Infrastructure regression checks failed or no tests passed.'
         }
 
     - name: Publish Bicep as Workflow Artifact
